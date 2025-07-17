@@ -1,5 +1,4 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -87,12 +86,16 @@ public abstract class GameModifierVelocity : GameModifierBase
 
 public class GameModifierLightweight : GameModifierVelocity
 {
-    public override string Name => "Lightweight";
-    public override string Description => "Max movement speed is much faster";
     public override bool SupportsRandomRounds => true;
     public override float SpeedMultiplier { get; protected set; } = 2.0f;
     public override HashSet<string> IncompatibleModifiers =>
     [
         "LeadBoots"
     ];
+
+    public GameModifierLightweight()
+    {
+        Name = "Lightweight";
+        Description = "Max movement speed is much faster";
+    }
 }

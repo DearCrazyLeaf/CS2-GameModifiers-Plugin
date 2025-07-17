@@ -1,11 +1,12 @@
-﻿
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Timers;
+using System.Threading.Tasks;
 
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -15,6 +16,7 @@ using CounterStrikeSharp.API.Modules.Utils;
 
 using GameModifiers.Modifiers;
 using GameModifiers.ThirdParty;
+using Microsoft.Extensions.Localization;
 using Microsoft.VisualBasic.CompilerServices;
 
 namespace GameModifiers;
@@ -71,43 +73,100 @@ internal static class GameModifiersUtils
         });
     }
 
-    public static void PrintTitleToChat(CCSPlayerController? player, string message)
+    // 新增：显示两次的中心消息方法，用于延长显示时间
+    public static void ShowMessageCentreAllWithExtendedDuration(string message, BasePlugin? plugin = null)
     {
-        if (player == null)
+        // 立即显示第一次
+        ShowMessageCentreAll(message);
+        //Console.WriteLine("[GameModifiersUtils] First center message displayed");
+        
+        // 如果有插件实例，使用AddTimer；否则使用Task.Delay
+        if (plugin != null)
         {
-            return;
+            // 第二次显示 - 3.5秒后
+            plugin.AddTimer(3.5f, () =>
+            {
+                ShowMessageCentreAll(message);
+                //Console.WriteLine("[GameModifiersUtils] Second center message displayed via AddTimer");
+            });
+            
+            // 第三次显示 - 7秒后
+            plugin.AddTimer(7.0f, () =>
+            {
+                ShowMessageCentreAll(message);
+                //Console.WriteLine("[GameModifiersUtils] Third center message displayed via AddTimer");
+            });
         }
-
-        player.PrintToChat($"[{ChatColors.Red}GameModifiers{ChatColors.Default}] {message}");
+        else
+        {
+            // 备用方案：使用Task.Delay - 第二次显示
+            Task.Run(async () =>
+            {
+                await Task.Delay(3500); // 等待3.5秒
+                
+                // 在主线程上执行第二次显示
+                Server.NextFrame(() =>
+                {
+                    ShowMessageCentreAll(message);
+                    //Console.WriteLine("[GameModifiersUtils] Second center message displayed via Task.Delay");
+                });
+            });
+            
+            // 备用方案：使用Task.Delay - 第三次显示
+            Task.Run(async () =>
+            {
+                await Task.Delay(7000); // 等待7秒
+                
+                // 在主线程上执行第三次显示
+                Server.NextFrame(() =>
+                {
+                    ShowMessageCentreAll(message);
+                    //Console.WriteLine("[GameModifiersUtils] Third center message displayed via Task.Delay");
+                });
+            });
+        }
     }
 
-    public static void PrintModifiersToChat(CCSPlayerController? player, List<GameModifierBase> modifiers, string message, bool withDescriptions = true)
+    // 添加支持本地化的重载方法
+    public static void PrintTitleToChat<T>(CCSPlayerController? player, string message, IStringLocalizer<T> localizer)
     {
         if (player == null)
         {
             return;
         }
 
-        PrintTitleToChat(player, message);
+        player.PrintToChat($"{localizer["GameModifiers"]}{message}");
+    }
+
+    // 添加支持本地化的重载方法
+    public static void PrintModifiersToChat<T>(CCSPlayerController? player, List<GameModifierBase> modifiers, string message, IStringLocalizer<T> localizer, bool withDescriptions = true)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        PrintTitleToChat(player, message, localizer);
 
         if (!modifiers.Any())
         {
-            player.PrintToChat($"None");
+            player.PrintToChat($"{localizer["None"]}");
             return;
         }
 
         foreach (var modifier in modifiers)
         {
-            string description = withDescriptions ? $" - [{modifier.Description}]" : "";
-            player.PrintToChat($"• {modifier.Name}{description}");
+            string description = withDescriptions ? $" - [{ChatColors.Lime}{modifier.Description}{ChatColors.Default}]{ChatColors.Default}" : "";
+            player.PrintToChat($"{modifier.Name}{description}");
         }
     }
 
-    public static void PrintTitleToChatAll(string message)
+    // 添加支持本地化的重载方法
+    public static void PrintTitleToChatAll<T>(string message, IStringLocalizer<T> localizer)
     {
         Utilities.GetPlayers().ForEach(controller =>
         {
-            PrintTitleToChat(controller, message);
+            PrintTitleToChat(controller, message, localizer);
         });
     }
 
@@ -331,7 +390,26 @@ internal static class GameModifiersUtils
 
     public static Vector? GetRandomLocation()
     {
-        return NavMesh.GetRandomPosition();
+        try
+        {
+            return NavMesh.GetRandomPosition();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GameModifiersUtils::GetRandomLocation] WARNING: Failed to get random location from NavMesh: {ex.Message}");
+            // 回退到使用出生点作为随机位置
+            var spawnPoints = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_terrorist")
+                .Concat(Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_counterterrorist"))
+                .ToList();
+
+            if (spawnPoints.Any())
+            {
+                var randomSpawn = spawnPoints[Random.Shared.Next(spawnPoints.Count)];
+                return randomSpawn.AbsOrigin;
+            }
+
+            return null;
+        }
     }
 
     public static Vector? GetSpawnLocation(CsTeam team)
@@ -438,8 +516,9 @@ internal static class GameModifiersUtils
         Vector? randomLocation = GetRandomLocation();
         if (randomLocation == null)
         {
-            Console.WriteLine($"[GameModifiersUtils::TeleportPlayerToRandomSpot] WARNING: Failed to find random location for {player.PlayerName}!");
-            return false;
+            Console.WriteLine($"[GameModifiersUtils::TeleportPlayerToRandomSpot] WARNING: Failed to find random location for {player.PlayerName}, using spawn area instead!");
+            // 回退到出生区域传送
+            return TeleportPlayerToSpawnArea(player);
         }
 
         TeleportPlayer(player, randomLocation);

@@ -1,14 +1,17 @@
-﻿
-using CounterStrikeSharp.API;
+﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 
 namespace GameModifiers.Modifiers;
 
 public class GameModifierVampire : GameModifierBase
 {
-    public override string Name => "Vampire";
-    public override string Description => "You steal the damage you deal";
     public override bool SupportsRandomRounds { get; protected set; } = true;
+
+    public GameModifierVampire()
+    {
+        Name = "Vampire";
+        Description = "You steal the damage you deal";
+    }
 
     public override void Enabled()
     {

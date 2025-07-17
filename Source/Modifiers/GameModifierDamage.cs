@@ -1,5 +1,4 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
@@ -34,24 +33,32 @@ public abstract class GameModifierDamageMultiplier : GameModifierBase
 
 public class GameModifierMoreDamage : GameModifierDamageMultiplier
 {
-    public override string Name => "MoreDamage";
-    public override string Description => "Damage dealt is doubled";
     public override bool SupportsRandomRounds => true;
     public override float DamageMultiplier { get; protected set; } = 2.0f;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierLessDamage>()
     ];
+
+    public GameModifierMoreDamage()
+    {
+        Name = "MoreDamage";
+        Description = "Damage dealt is doubled";
+    }
 }
 
 public class GameModifierLessDamage : GameModifierDamageMultiplier
 {
-    public override string Name => "LessDamage";
-    public override string Description => "Damage dealt is halved";
     public override bool SupportsRandomRounds => true;
     public override float DamageMultiplier { get; protected set; } = 0.5f;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierMoreDamage>()
     ];
+
+    public GameModifierLessDamage()
+    {
+        Name = "LessDamage";
+        Description = "Damage dealt is halved";
+    }
 }

@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -189,17 +188,21 @@ public abstract class GameModifierXrayBase : GameModifierBase
 
 public class GameModifierXrayAll : GameModifierXrayBase
 {
-    public override string Name => "Xray";
-    public override string Description => "Everyone can see each other through walls";
     public override bool SupportsRandomRounds { get; protected set; } = true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+        //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
         GameModifiersUtils.GetModifierName<GameModifierXrayRandom>(),
         GameModifiersUtils.GetModifierName<GameModifierXraySingle>()
     ];
+
+    public GameModifierXrayAll()
+    {
+        Name = "Xray";
+        Description = "Everyone can see each other through walls";
+    }
     
     protected override bool CheckEnableXray(CCSPlayerController player)
     {
@@ -209,17 +212,21 @@ public class GameModifierXrayAll : GameModifierXrayBase
 
 public class GameModifierXrayRandom : GameModifierXrayBase
 {
-    public override string Name => "RandomXray";
-    public override string Description => "Some people can see each other through walls";
     public override bool SupportsRandomRounds { get; protected set; } = true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+        //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
         GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
         GameModifiersUtils.GetModifierName<GameModifierXraySingle>()
     ];
+
+    public GameModifierXrayRandom()
+    {
+        Name = "RandomXray";
+        Description = "Some people can see each other through walls";
+    }
     
     protected override bool CheckEnableXray(CCSPlayerController player)
     {
@@ -234,17 +241,21 @@ public class GameModifierXrayRandom : GameModifierXrayBase
 
 public class GameModifierXraySingle : GameModifierXrayBase
 {
-    public override string Name => "SoloXray";
-    public override string Description => "One person on each team has walls";
     public override bool SupportsRandomRounds { get; protected set; } = true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+        //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
+        //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
         GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
         GameModifiersUtils.GetModifierName<GameModifierXrayRandom>()
     ];
+
+    public GameModifierXraySingle()
+    {
+        Name = "SoloXray";
+        Description = "One person on each team has walls";
+    }
     
     protected override void SetupXray()
     {

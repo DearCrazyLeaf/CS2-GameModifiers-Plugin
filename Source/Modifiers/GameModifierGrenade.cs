@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -10,9 +9,13 @@ namespace GameModifiers.Modifiers;
 
 public class GameModifierLongerFlashes : GameModifierBase
 {
-    public override string Name => "LongerFlashes";
-    public override string Description => "Flash bang effect lasts 3 times longer";
     public override bool SupportsRandomRounds => true;
+
+    public GameModifierLongerFlashes()
+    {
+        Name = "LongerFlashes";
+        Description = "Flash bang effect lasts 3 times longer";
+    }
 
     public override void Enabled()
     {
@@ -110,9 +113,13 @@ public abstract class GameModifierGrenadeSpawned : GameModifierBase
 
 public class GameModifierRandomGrenadeTime : GameModifierGrenadeSpawned
 {
-    public override string Name => "DodgyGrenades";
-    public override string Description => "Timers on flashes and HE's are randomized";
     public override bool SupportsRandomRounds => true;
+
+    public GameModifierRandomGrenadeTime()
+    {
+        Name = "DodgyGrenades";
+        Description = "Timers on flashes and HE's are randomized";
+    }
 
     protected override void OnGrenadeSpawned(CBaseCSGrenadeProjectile grenadeProjectile)
     {
@@ -132,50 +139,6 @@ public class GameModifierRandomGrenadeTime : GameModifierGrenadeSpawned
                     grenadeProjectile.DetonateTime = Server.CurrentTime + (float)random.Next(1, 12);
 
                     Utilities.SetStateChanged(grenadeProjectile, "CBaseGrenade", "m_flDetonateTime");
-                });
-            }
-            break;
-        }
-    }
-}
-
-public class GameModifierRainbowSmokes : GameModifierGrenadeSpawned
-{
-    public override string Name => "RainbowSmokes";
-    public override string Description => "Smokes colors are randomized";
-    public override bool SupportsRandomRounds => true;
-
-    private static readonly List<Color> ColorsList =
-    [
-        Color.Aqua,
-        Color.Blue,
-        Color.Fuchsia,
-        Color.Green,
-        Color.Lime,
-        Color.Orange,
-        Color.Violet,
-        Color.Pink,
-        Color.Purple,
-        Color.Indigo,
-        Color.Red,
-        Color.HotPink,
-        Color.Yellow
-    ];
-
-    protected override void OnGrenadeSpawned(CBaseCSGrenadeProjectile grenadeProjectile)
-    {
-        switch (grenadeProjectile.DesignerName)
-        {
-            case "smokegrenade_projectile":
-            {
-                Server.NextFrame(() =>
-                {
-                    CSmokeGrenadeProjectile smokeGrenadeProjectile = grenadeProjectile.As<CSmokeGrenadeProjectile>();
-
-                    Color randomColor = ColorsList[Random.Shared.Next(ColorsList.Count)];
-                    smokeGrenadeProjectile.SmokeColor.X = randomColor.R;
-                    smokeGrenadeProjectile.SmokeColor.Y = randomColor.G;
-                    smokeGrenadeProjectile.SmokeColor.Z = randomColor.B;
                 });
             }
             break;

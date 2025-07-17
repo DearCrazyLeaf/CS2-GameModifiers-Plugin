@@ -1,5 +1,4 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -132,8 +131,12 @@ public abstract class GameModifierScalePlayer : GameModifierBase
 
 public class GameModifierSmallPlayers : GameModifierScalePlayer
 {
-    public override string Name => "SmallPlayers";
-    public override string Description => "Everyone is 2X smaller";
     public override bool SupportsRandomRounds => true;
     public override float Scale => 0.5f;
+
+    public GameModifierSmallPlayers()
+    {
+        Name = "SmallPlayers";
+        Description = "Everyone is 2X smaller";
+    }
 }

@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -105,8 +104,6 @@ public abstract class GameModifierWeapon : GameModifierBase
 
 public class GameModifierOnePerMag : GameModifierWeapon
 {
-    public override string Name => "OnePerReload";
-    public override string Description => "1 bullet per reload";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
@@ -114,6 +111,12 @@ public class GameModifierOnePerMag : GameModifierWeapon
         "InfiniteAmmo"
     ];
     private readonly Dictionary<string, int> _cachedMaxClip1 = new();
+
+    public GameModifierOnePerMag()
+    {
+        Name = "OnePerReload";
+        Description = "1 bullet per reload";
+    }
 
     protected override bool ApplyWeaponModifier(CBasePlayerWeapon? weapon)
     {
@@ -182,14 +185,18 @@ public class GameModifierOnePerMag : GameModifierWeapon
 
 public class GameModifierOneInTheChamber : GameModifierWeapon
 {
-    public override string Name => "OneInTheChamber";
-    public override string Description => "1 bullet per kill, pistols one hit";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierOnePerMag>(),
         "InfiniteAmmo"
     ];
+
+    public GameModifierOneInTheChamber()
+    {
+        Name = "OneInTheChamber";
+        Description = "1 bullet per kill, pistols one hit";
+    }
 
     public override void Enabled()
     {
@@ -329,13 +336,17 @@ public abstract class GameModifierFireRateBase : GameModifierBase
 
 public class GameModifierNoSpread : GameModifierBase
 {
-    public override string Name => "NoSpread";
-    public override string Description => "Weapons have perfect aim";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         "IncreasedSpread"
     ];
+
+    public GameModifierNoSpread()
+    {
+        Name = "NoSpread";
+        Description = "Weapons have perfect aim";
+    }
 
     public override void Enabled()
     {
@@ -389,24 +400,32 @@ public class GameModifierNoSpread : GameModifierBase
 
 public class GameModifierFastFireRate : GameModifierFireRateBase
 {
-    public override string Name => "FastFireRate";
-    public override string Description => "Fire rate is 2 times faster";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierSlowFireRate>()
     ];
     public override float FireRateMultiplier { get; protected set; } = 2.0f;
+
+    public GameModifierFastFireRate()
+    {
+        Name = "FastFireRate";
+        Description = "Fire rate is 2 times faster";
+    }
 }
 
 public class GameModifierSlowFireRate : GameModifierFireRateBase
 {
-    public override string Name => "SlowFireRate";
-    public override string Description => "Fire rate is 2 times slower";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierFastFireRate>()
     ];
     public override float FireRateMultiplier { get; protected set; } = 0.5f;
+
+    public GameModifierSlowFireRate()
+    {
+        Name = "SlowFireRate";
+        Description = "Fire rate is 2 times slower";
+    }
 }

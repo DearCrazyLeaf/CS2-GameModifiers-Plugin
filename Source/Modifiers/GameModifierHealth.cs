@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -108,8 +107,6 @@ public abstract class GameModifierHealth : GameModifierBase
 
 public class GameModifierJuggernaut : GameModifierHealth
 {
-    public override string Name => "Juggernaut";
-    public override string Description => "Everyone's max health is set to 500";
     public override bool SupportsRandomRounds => true;
     public override int MaxHealth { get; protected set; } = 500;
     public override HashSet<string> IncompatibleModifiers =>
@@ -117,12 +114,16 @@ public class GameModifierJuggernaut : GameModifierHealth
         GameModifiersUtils.GetModifierName<GameModifierGlassCannon>(),
         GameModifiersUtils.GetModifierName<GameModifierRandomHealth>()
     ];
+
+    public GameModifierJuggernaut()
+    {
+        Name = "Juggernaut";
+        Description = "Everyone's max health is set to 500";
+    }
 }
 
 public class GameModifierGlassCannon : GameModifierHealth
 {
-    public override string Name => "GlassCannon";
-    public override string Description => "Everyone is 1 hit to kill";
     public override bool SupportsRandomRounds => true;
     public override int MaxHealth { get; protected set; } = 1;
     public override HashSet<string> IncompatibleModifiers =>
@@ -130,12 +131,16 @@ public class GameModifierGlassCannon : GameModifierHealth
         GameModifiersUtils.GetModifierName<GameModifierJuggernaut>(),
         GameModifiersUtils.GetModifierName<GameModifierRandomHealth>()
     ];
+
+    public GameModifierGlassCannon()
+    {
+        Name = "GlassCannon";
+        Description = "Everyone is 1 hit to kill";
+    }
 }
 
 public class GameModifierRandomHealth : GameModifierHealth
 {
-    public override string Name => "RandomHealth";
-    public override string Description => "Everyone's health is set to a random number";
     public override bool SupportsRandomRounds => true;
     private readonly Tuple<int, int> HealthRange = new Tuple<int, int>(1, 100);
     public override HashSet<string> IncompatibleModifiers =>
@@ -143,6 +148,12 @@ public class GameModifierRandomHealth : GameModifierHealth
         GameModifiersUtils.GetModifierName<GameModifierJuggernaut>(),
         GameModifiersUtils.GetModifierName<GameModifierGlassCannon>()
     ];
+
+    public GameModifierRandomHealth()
+    {
+        Name = "RandomHealth";
+        Description = "Everyone's health is set to a random number";
+    }
 
     protected override void ApplyHealthToPlayer(CCSPlayerController? player)
     {

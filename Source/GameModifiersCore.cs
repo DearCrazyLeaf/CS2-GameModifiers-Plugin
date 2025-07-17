@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
@@ -9,6 +8,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Localization;
 
 using GameModifiers.Modifiers;
 
@@ -16,19 +16,25 @@ namespace GameModifiers;
 
 public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 {
-    public override string ModuleName => "Game Modifiers";
-    public override string ModuleAuthor => "Shr00mDev";
+    public override string ModuleName => "Game Modifiers(hlymcn edition)";
+    public override string ModuleAuthor => "Shr00mDev|hlymcn";
     public override string ModuleDescription => "Apply game modifiers dynamically based of pre-defined classes or config files.";
-    public override string ModuleVersion => "1.0.3";
+    public override string ModuleVersion => "[hlymcn]2.0.0";
     public GameModifiersConfig Config { get; set; } = new();
     public bool RandomRoundsEnabled { get; private set; } = false;
     private List<GameModifierBase> RegisteredModifiers { get; } = new();
     private List<GameModifierBase> ActiveModifiers { get; } = new();
     private List<GameModifierBase> LastActiveModifiers { get; set; } = new();
+    public readonly IStringLocalizer<GameModifiersCore> _localizer;
 
     private int _minRandomRounds = 1;
     private int _maxRandomRounds = 1;
-    
+
+    public GameModifiersCore(IStringLocalizer<GameModifiersCore> localizer)
+    {
+        _localizer = localizer;
+    }
+
     public void OnConfigParsed(GameModifiersConfig config)
     {
         Config = config;
@@ -172,7 +178,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             return;
         }
 
-        GameModifiersUtils.PrintTitleToChat(player, "Reloading Modifiers...");
+        GameModifiersUtils.PrintTitleToChat(player, _localizer["Reloading Modifiers..."], _localizer);
 
         RemoveAllModifiers();
         Initialise();
@@ -182,14 +188,14 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     [ConsoleCommand("css_listmodifiers", "Prints the name and description for each registered modifier.")]
     public void OnListModifiers(CCSPlayerController? player, CommandInfo info)
     {
-        GameModifiersUtils.PrintModifiersToChat(player, RegisteredModifiers, "Registered modifiers");
+        GameModifiersUtils.PrintModifiersToChat(player, RegisteredModifiers, _localizer["Registered modifiers"], _localizer);
     }
 
     // !ListActiveModifiers - List active modifiers and descriptions.
     [ConsoleCommand("css_listactivemodifiers", "Prints the name and description for each active modifier.")]
     public void OnListActiveModifiers(CCSPlayerController? player, CommandInfo info)
     {
-        GameModifiersUtils.PrintModifiersToChat(player, ActiveModifiers, "Active modifiers");
+        GameModifiersUtils.PrintModifiersToChat(player, ActiveModifiers, _localizer["Active modifiers"], _localizer);
     }
 
     // !AddModifier - Add a modifier by name.
@@ -206,11 +212,11 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         var modifierName = info.GetArg(1);
         if (AddModifierByName(modifierName, out string addMessage))
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"Added {modifierName} modifier.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Added {0} modifier.", modifierName], _localizer);
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, addMessage);
+            GameModifiersUtils.PrintTitleToChat(player, addMessage, _localizer);
         }
     }
 
@@ -230,12 +236,12 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (ToggleModifierByName(modifierName, out string toggleMessage))
         {
-             string modifierAction = modifierWasActive ? "Removed" : "Added";
-             GameModifiersUtils.PrintTitleToChat(player, $"{modifierAction} {modifierName} modifier.");
+             string modifierAction = modifierWasActive ? _localizer["Removed"] : _localizer["Added"];
+             GameModifiersUtils.PrintTitleToChat(player, _localizer["{0} {1} modifier.", modifierAction, modifierName], _localizer);
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, toggleMessage);
+            GameModifiersUtils.PrintTitleToChat(player, toggleMessage, _localizer);
         }
     }
 
@@ -251,7 +257,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (!AddRandomModifier(out GameModifierBase? addedModifier))
         {
-            GameModifiersUtils.PrintTitleToChat(player, "Failed to add random modifier.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Failed to add random modifier."], _localizer);
         }
     }
 
@@ -272,18 +278,18 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             {
                 if (modifierCount == addedModifiers.Count)
                 {
-                    GameModifiersUtils.PrintTitleToChat(player, $"Adding {modifierCount.ToString()} random modifiers.");
+                    GameModifiersUtils.PrintTitleToChat(player, _localizer["Adding {0} random modifiers.", modifierCount.ToString()], _localizer);
                 }
                 else
                 {
-                    GameModifiersUtils.PrintTitleToChat(player, $"Only added {addedModifiers.Count.ToString()} random modifiers.");
+                    GameModifiersUtils.PrintTitleToChat(player, _localizer["Only added {0} random modifiers.", addedModifiers.Count.ToString()], _localizer);
                 }
 
                 return;
             }
         }
 
-        GameModifiersUtils.PrintTitleToChat(player, "Failed to add random modifiers.");
+        GameModifiersUtils.PrintTitleToChat(player, _localizer["Failed to add random modifiers."], _localizer);
     }
 
     // !RemoveModifier - Remove a modifier by name.
@@ -299,7 +305,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         var modifierName = info.GetArg(1);
         RemoveModifierByName(modifierName, out string removeMessage);
-        GameModifiersUtils.PrintTitleToChat(player, removeMessage);
+        GameModifiersUtils.PrintTitleToChat(player, removeMessage, _localizer);
     }
 
     // !RemoveModifiers - Clear / Remove all active modifiers.
@@ -314,7 +320,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         RemoveAllModifiers();
 
-        GameModifiersUtils.PrintTitleToChat(player, "Removed all modifiers.");
+        GameModifiersUtils.PrintTitleToChat(player, _localizer["Removed all modifiers."], _localizer);
     }
 
     // !RandomRounds - Toggle random rounds on/off.
@@ -329,7 +335,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (RandomRoundsEnabled == false && RegisteredModifiers.Count <= 0)
         {
-            GameModifiersUtils.PrintTitleToChat(player, "No modifiers are registered! Cannot activate random rounds!");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["No modifiers are registered! Cannot activate random rounds!"], _localizer);
             return;
         }
 
@@ -350,12 +356,12 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         var minInput = info.GetArg(1);
         if (int.TryParse(minInput, out int result))
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"Min modifiers for random rounds set to {minInput}");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Min modifiers for random rounds set to {0}", minInput], _localizer);
             _minRandomRounds = result;
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"Failed to set min modifiers for random rounds to {minInput}");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Failed to set min modifiers for random rounds to {0}", minInput], _localizer);
         }
     }
 
@@ -373,12 +379,12 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         var maxInput = info.GetArg(1);
         if (int.TryParse(maxInput, out int result))
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"Max modifiers for random rounds set to {maxInput}");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Max modifiers for random rounds set to {0}", maxInput], _localizer);
             _maxRandomRounds = result;
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"Failed to set max modifiers for random rounds to {maxInput}");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Failed to set max modifiers for random rounds to {0}", maxInput], _localizer);
         }
     }
 
@@ -394,13 +400,13 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (RandomRoundsEnabled == false)
         {
-            GameModifiersUtils.PrintTitleToChat(player, "Random rounds are not enabled! Cannot re-roll modifiers.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["Random rounds are not enabled! Cannot re-roll modifiers."], _localizer);
             return;
         }
 
         if (!RegisteredModifiers.Any())
         {
-            GameModifiersUtils.PrintTitleToChat(player, "No registered modifiers found! Cannot re-roll modifiers.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["No registered modifiers found! Cannot re-roll modifiers."], _localizer);
             return;
         }
 
@@ -409,37 +415,37 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     }
 
     // !bhop - Enable/Disable the bhop modifier for all players.
-    [ConsoleCommand("css_bhop", "Enable/Disable the bhop modifier")]
-    [RequiresPermissions("@css/root")]
-    public void OnBunnyHop(CCSPlayerController? player, CommandInfo info)
-    {
-        if (player != null)
-        {
-            ToggleModifierByNameCommand(player, "Bhop");
-        }
-    }
+    //[ConsoleCommand("css_bhop", "Enable/Disable the bhop modifier")]
+    //[RequiresPermissions("@css/root")]
+    //public void OnBunnyHop(CCSPlayerController? player, CommandInfo info)
+    //{
+    //    if (player != null)
+    //    {
+    //        ToggleModifierByNameCommand(player, "Bhop");
+    //    }
+    //}
 
     // !surf - Enable/Disable the surf modifier for all players.
-    [ConsoleCommand("css_surf", "Enable/Disable the surf modifier")]
-    [RequiresPermissions("@css/root")]
-    public void OnSurf(CCSPlayerController? player, CommandInfo info)
-    {
-        if (player != null)
-        {
-            ToggleModifierByNameCommand(player, "Surf");
-        }
-    }
+    //[ConsoleCommand("css_surf", "Enable/Disable the surf modifier")]
+    //[RequiresPermissions("@css/root")]
+    //public void OnSurf(CCSPlayerController? player, CommandInfo info)
+    //{
+    //    if (player != null)
+    //    {
+    //        ToggleModifierByNameCommand(player, "Surf");
+    //    }
+    //}
 
     // !xray - Enable/Disable the xray modifier for all players.
-    [ConsoleCommand("css_xray", "Enable/Disable the xray modifier for all players")]
-    [RequiresPermissions("@css/root")]
-    public void OnXray(CCSPlayerController? player, CommandInfo info)
-    {
-        if (player != null)
-        {
-            ToggleModifierCommand(player, typeof(GameModifierXrayAll));
-        }
-    }
+    //[ConsoleCommand("css_xray", "Enable/Disable the xray modifier for all players")]
+    //[RequiresPermissions("@css/root")]
+    //public void OnXray(CCSPlayerController? player, CommandInfo info)
+    //{
+    //    if (player != null)
+    //    {
+    //        ToggleModifierCommand(player, typeof(GameModifierXrayAll));
+    //    }
+    //}
 
     [GameEventHandler]
     public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
@@ -448,7 +454,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         {
             if (!RegisteredModifiers.Any())
             {
-                GameModifiersUtils.PrintTitleToChatAll("No registered modifiers found! Skipping random round...");
+                GameModifiersUtils.PrintTitleToChatAll(_localizer["No registered modifiers found! Skipping random round..."], _localizer);
                 return HookResult.Continue;
             }
             
@@ -456,7 +462,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             
             if (Config.DisableRandomRoundsInWarmup && GameModifiersUtils.IsWarmupActive())
             {
-                GameModifiersUtils.PrintTitleToChatAll("Random rounds will start after warmup period...");
+                GameModifiersUtils.PrintTitleToChatAll(_localizer["Random rounds will start after warmup period..."], _localizer);
             }
             else
             {
@@ -553,8 +559,9 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             RemoveAllModifiers();
         }
         
-        GameModifiersUtils.PrintTitleToChatAll(RandomRoundsEnabled ? "Random rounds enabled for next round!" : "Random rounds disabled!");
-        GameModifiersUtils.ShowMessageCentreAll($"Random Rounds {(RandomRoundsEnabled ? "Enabled" : "Disabled")}");
+        GameModifiersUtils.PrintTitleToChatAll(RandomRoundsEnabled ? _localizer["Random rounds enabled for next round!"] : _localizer["Random rounds disabled!"], _localizer);
+        // 只在切换随机回合开关时显示简单的中心消息，不使用延长显示
+        GameModifiersUtils.ShowMessageCentreAll(_localizer["Random Rounds {0}", (RandomRoundsEnabled ? _localizer["Enabled"] : _localizer["Disabled"])]);
     }
 
     public void ApplyRandomRoundsForRound()
@@ -568,7 +575,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChatAll($"Failed to apply random modifiers! Skipping random round...");
+            GameModifiersUtils.PrintTitleToChatAll(_localizer["Failed to apply random modifiers! Skipping random round..."], _localizer);
         }
     }
 
@@ -577,7 +584,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         if (modifier == null)
         {
             Console.WriteLine("[GameModifiers::ToggleModifier] WARNING: Trying to toggle null modifier!");
-            message = "Modifier is null?";
+            message = _localizer["Modifier is null?"];
             return false;
         }
 
@@ -594,7 +601,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         if (IsModifierRegisteredByName(modifierName) == false)
         {
             Console.WriteLine($"[GameModifiers::ToggleModifierByName] Trying to toggle un-registered modifier {modifierName}!");
-            message = $"{modifierName} modifier is not registered.";
+            message = _localizer["{0} modifier is not registered.", modifierName];
             return false;
         }
 
@@ -625,11 +632,11 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (ToggleModifier(modifierInstance, out string toggleMessage))
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"{modifierInstance.Name} {(modifierWasActive ? "Disabled" : "Enabled")}.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["{0} {1}.", modifierInstance.Name, (modifierWasActive ? _localizer["Disabled"] : _localizer["Enabled"])], _localizer);
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, toggleMessage);
+            GameModifiersUtils.PrintTitleToChat(player, toggleMessage, _localizer);
         }
     }
 
@@ -639,11 +646,11 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (ToggleModifierByName(modifierName, out string toggleMessage))
         {
-            GameModifiersUtils.PrintTitleToChat(player, $"{modifierName} {(modifierWasActive ? "Disabled" : "Enabled")}.");
+            GameModifiersUtils.PrintTitleToChat(player, _localizer["{0} {1}.", modifierName, (modifierWasActive ? _localizer["Disabled"] : _localizer["Enabled"])], _localizer);
         }
         else
         {
-            GameModifiersUtils.PrintTitleToChat(player, toggleMessage);
+            GameModifiersUtils.PrintTitleToChat(player, toggleMessage, _localizer);
         }
     }
 
@@ -651,7 +658,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     {
         if (!RegisteredModifiers.Any())
         {
-            message = "No modifiers are registered.";
+            message = _localizer["No modifiers are registered."];
             return false;
         }
 
@@ -661,7 +668,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             return AddModifier(registeredModifier, out message);
         }
 
-        message = $"{modifierName} modifier is not registered!";
+        message = _localizer["{0} modifier is not registered!", modifierName];
         return false;
     }
 
@@ -670,7 +677,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         if (modifier == null)
         {
             Console.WriteLine("[GameModifiers::AddModifier] WARNING: Trying to add null modifier!");
-            message = "Modifier is null?";
+            message = _localizer["Modifier is null?"];
             return false;
         }
 
@@ -685,7 +692,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (blockingModifierNames.Any())
         {
-            message = $"{modifier.Name} modifier is blocked by:";
+            message = _localizer["{0} modifier is blocked by:", modifier.Name];
             foreach (var blockingModifierName in blockingModifierNames)
             {
                 message += $"\u2029• {blockingModifierName}";
@@ -696,12 +703,12 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (ActiveModifiers.Contains(modifier))
         {
-            message = $"{modifier.Name} modifier is already active.";
+            message = _localizer["{0} modifier is already active.", modifier.Name];
             return false;
         }
 
         ActivateModifier(modifier);
-        message = $"Successfully added {modifier.Name} modifier.";
+        message = _localizer["Successfully added {0} modifier.", modifier.Name];
         return true;
     }
 
@@ -709,7 +716,8 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     {
         if (!ActiveModifiers.Any())
         {
-            message = "No modifiers are active.";
+            message = _localizer["No modifiers are active."];
+
             return;
         }
         
@@ -722,7 +730,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             }
         }
 
-        message = $"{modifierName} modifier is not active.";
+        message = _localizer["{0} modifier is not active.", modifierName];
     }
 
     public bool RemoveModifier(GameModifierBase? modifier, out string message)
@@ -730,19 +738,19 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         if (modifier == null)
         {
             Console.WriteLine("[GameModifiers::RemoveModifier] WARNING: Trying to remove null modifier!");
-            message = "Modifier is null?";
+            message = _localizer["Modifier is null?"];
             return false;
         }
 
         if (!ActiveModifiers.Contains(modifier))
         {
-            message = $"{modifier.Name} modifier is not active.";
+            message = _localizer["{0} modifier is not active.", modifier.Name];
             return true;
         }
 
         modifier.Disabled();
         ActiveModifiers.Remove(modifier);
-        message = $"Removed {modifier.Name} modifier.";
+        message = _localizer["Removed {0} modifier.", modifier.Name];
         return true;
     }
 
@@ -753,15 +761,24 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             return;
         }
         
-        GameModifiersUtils.PrintTitleToChatAll("Removing modifiers:");
+        // 构建完整的移除消息，包含标题和所有修改器名称
+        string completeMessage = _localizer["Removing modifiers:"];
+        for (var index = 0; index < ActiveModifiers.Count; index++)
+        {
+            completeMessage += ActiveModifiers[index].Name;
+            if (index < ActiveModifiers.Count - 1)
+            {
+                completeMessage += ", ";
+            }
+        }
+        
+        GameModifiersUtils.PrintTitleToChatAll(completeMessage, _localizer);
 
         // Undo modifiers in the order they were applied.
         for (var index = ActiveModifiers.Count - 1; index >= 0; index--)
         {
             var modifier = ActiveModifiers[index];
             modifier.Disabled();
-            
-            GameModifiersUtils.PrintToChatAll($"• {modifier.Name}");
         }
 
         ActiveModifiers.Clear();
@@ -853,7 +870,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             return;
         }
 
-        ActivateModifiers([modifier]);
+        ActivateModifiers(new List<GameModifierBase> { modifier });
     }
 
     private void ActivateModifiers(List<GameModifierBase> modifiers)
@@ -865,26 +882,35 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
         if (Config.ShowCentreMsg)
         {
-            string centreActivationMsg = $"Activating Modifiers:\u2029";
+            // 构建包含游戏模式和描述的详细中心消息
+            string centreActivationMsg = _localizer["Activating Modifiers:"] + "\n";
 
             for (var index = 0; index < modifiers.Count; index++)
             {
-                if (index != 0)
+                if (index > 0)
                 {
-                    centreActivationMsg += ", ";
+                    centreActivationMsg += "\n";
                 }
 
-                centreActivationMsg += $"{modifiers[index].Name}";
+                centreActivationMsg += $"{modifiers[index].Name} - {modifiers[index].Description}";
             }
 
-            GameModifiersUtils.ShowMessageCentreAll(centreActivationMsg);
+            // 使用新的延长显示时间方法，只在激活时显示两次，传递this插件实例
+            GameModifiersUtils.ShowMessageCentreAllWithExtendedDuration(centreActivationMsg, this);
         }
 
-        GameModifiersUtils.PrintTitleToChatAll("Activating modifiers:");
-        foreach (var modifier in modifiers)
+        // 构建完整的消息，包含标题和所有修改器
+        string completeMessage = _localizer["Activating modifiers:"];
+        for (var index = 0; index < modifiers.Count; index++)
         {
-            GameModifiersUtils.PrintToChatAll($"• {modifier.Name} - {ChatColors.Grey}[{modifier.Description}]");
+            completeMessage += $"{modifiers[index].Name} - [{ChatColors.Lime}{modifiers[index].Description}{ChatColors.Default}]";
+            if (index < modifiers.Count - 1)
+            {
+                completeMessage += ", ";
+            }
         }
+        
+        GameModifiersUtils.PrintTitleToChatAll(completeMessage, _localizer);
 
         foreach (GameModifierBase? modifier in modifiers)
         {

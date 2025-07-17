@@ -1,6 +1,4 @@
-﻿
-using System.Collections.Generic;
-
+﻿using System.Collections.Generic;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 
@@ -8,16 +6,20 @@ namespace GameModifiers.Modifiers;
 
 public class GameModifierSwapPlacesOnKill : GameModifierBase
 {
-    public override string Name => "SwapOnDeath";
-    public override string Description => "Players will swap places on kill.";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
         GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
     ];
+
+    public GameModifierSwapPlacesOnKill()
+    {
+        Name = "SwapOnDeath";
+        Description = "Players will swap places on kill.";
+    }
 
     public override void Enabled()
     {
@@ -72,16 +74,20 @@ public class GameModifierSwapPlacesOnKill : GameModifierBase
 
 public class GameModifierSwapPlacesOnHit : GameModifierBase
 {
-    public override string Name => "SwapOnHit";
-    public override string Description => "Players will swap places on hit";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
         GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
     ];
+
+    public GameModifierSwapPlacesOnHit()
+    {
+        Name = "SwapOnHit";
+        Description = "Players will swap places on hit";
+    }
 
     public override void Enabled()
     {
@@ -110,160 +116,176 @@ public class GameModifierSwapPlacesOnHit : GameModifierBase
     }
 }
 
-public class GameModifierRandomSpawn : GameModifierBase
-{
-    public override string Name => "RandomSpawns";
-    public override string Description => "Players spawn locations are randomized";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierImposters>()
-    ];
+//public class GameModifierRandomSpawn : GameModifierBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierImposters>()
+//    ];
 
-    public override void Enabled()
-    {
-        base.Enabled();
+//    public GameModifierRandomSpawn()
+//    {
+//        Name = "RandomSpawns";
+//        Description = "Players spawn locations are randomized";
+//    }
 
-        if (Core != null)
-        {
-            Core.RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-        }
+//    public override void Enabled()
+//    {
+//        base.Enabled();
 
-        Utilities.GetPlayers().ForEach(ApplyRandomSpawnToPlayer);
-    }
+//        if (Core != null)
+//        {
+//            Core.RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+//        }
 
-    public override void Disabled()
-    {
-        if (Core != null)
-        {
-            Core.DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-        }
+//        Utilities.GetPlayers().ForEach(ApplyRandomSpawnToPlayer);
+//    }
 
-        base.Disabled();
-    }
+//    public override void Disabled()
+//    {
+//        if (Core != null)
+//        {
+//            Core.DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+//        }
 
-    protected void ApplyRandomSpawnToPlayer(CCSPlayerController? player)
-    {
-        GameModifiersUtils.TeleportPlayerToRandomSpot(player);
-    }
+//        base.Disabled();
+//    }
 
-    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
-    {
-        var player = @event.Userid;
-        if (player == null || player.IsValid == false || player.Connected != PlayerConnectedState.PlayerConnected)
-        {
-            return HookResult.Continue;
-        }
+//    protected void ApplyRandomSpawnToPlayer(CCSPlayerController? player)
+//    {
+//        GameModifiersUtils.TeleportPlayerToRandomSpot(player);
+//    }
 
-        ApplyRandomSpawnToPlayer(player);
-        return HookResult.Continue;
-    }
-}
+//    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
+//    {
+//        var player = @event.Userid;
+//        if (player == null || player.IsValid == false || player.Connected != PlayerConnectedState.PlayerConnected)
+//        {
+//            return HookResult.Continue;
+//        }
 
-public class GameModifierTeleportOnReload : GameModifierBase
-{
-    public override string Name => "TeleportOnReload";
-    public override string Description => "Players are teleported to a random spot on reload";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
-        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
-        GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
-    ];
+//        ApplyRandomSpawnToPlayer(player);
+//        return HookResult.Continue;
+//    }
+//}
 
-    public override void Enabled()
-    {
-        base.Enabled();
+//public class GameModifierTeleportOnReload : GameModifierBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
+//        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
+//        GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>(),
+//        GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
+//    ];
 
-        if (Core != null)
-        {
-            Core.RegisterEventHandler<EventWeaponReload>(OnPlayerReload);
-        }
-    }
+//    public GameModifierTeleportOnReload()
+//    {
+//        Name = "TeleportOnReload";
+//        Description = "Players are teleported to a random spot on reload";
+//    }
 
-    public override void Disabled()
-    {
-        if (Core != null)
-        {
-            Core.DeregisterEventHandler<EventWeaponReload>(OnPlayerReload);
-        }
+//    public override void Enabled()
+//    {
+//        base.Enabled();
 
-        base.Disabled();
-    }
+//        if (Core != null)
+//        {
+//            Core.RegisterEventHandler<EventWeaponReload>(OnPlayerReload);
+//        }
+//    }
 
-    private HookResult OnPlayerReload(EventWeaponReload @event, GameEventInfo info)
-    {
-        CCSPlayerController? reloadingPlayer = @event.Userid;
-        if (reloadingPlayer == null || !reloadingPlayer.IsValid || !reloadingPlayer.PawnIsAlive)
-        {
-            return HookResult.Continue;
-        }
+//    public override void Disabled()
+//    {
+//        if (Core != null)
+//        {
+//            Core.DeregisterEventHandler<EventWeaponReload>(OnPlayerReload);
+//        }
 
-        GameModifiersUtils.TeleportPlayerToRandomSpot(reloadingPlayer);
-        return HookResult.Continue;
-    }
-}
+//        base.Disabled();
+//    }
 
-public class GameModifierTeleportOnHit : GameModifierBase
-{
-    public override string Name => "TeleportOnHit";
-    public override string Description => "Players are teleported to a random spot on hit";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
-        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
-        GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
-    ];
+//    private HookResult OnPlayerReload(EventWeaponReload @event, GameEventInfo info)
+//    {
+//        CCSPlayerController? reloadingPlayer = @event.Userid;
+//        if (reloadingPlayer == null || !reloadingPlayer.IsValid || !reloadingPlayer.PawnIsAlive)
+//        {
+//            return HookResult.Continue;
+//        }
 
-    public override void Enabled()
-    {
-        base.Enabled();
+//        GameModifiersUtils.TeleportPlayerToRandomSpot(reloadingPlayer);
+//        return HookResult.Continue;
+//    }
+//}
 
-        if (Core != null)
-        {
-            Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-        }
-    }
+//public class GameModifierTeleportOnHit : GameModifierBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
+//        GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
+//        GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
+//        GameModifiersUtils.GetModifierName<GameModifierResetOnReload>()
+//    ];
 
-    public override void Disabled()
-    {
-        if (Core != null)
-        {
-            Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-        }
+//    public GameModifierTeleportOnHit()
+//    {
+//        Name = "TeleportOnHit";
+//        Description = "Players are teleported to a random spot on hit";
+//    }
 
-        base.Disabled();
-    }
+//    public override void Enabled()
+//    {
+//        base.Enabled();
 
-    private HookResult OnPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
-    {
-        CCSPlayerController? damagedPlayer = @event.Userid;
-        if (damagedPlayer == null || !damagedPlayer.IsValid || !damagedPlayer.PawnIsAlive)
-        {
-            return HookResult.Continue;
-        }
+//        if (Core != null)
+//        {
+//            Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+//        }
+//    }
 
-        GameModifiersUtils.TeleportPlayerToRandomSpot(damagedPlayer);
-        return HookResult.Continue;
-    }
-}
+//    public override void Disabled()
+//    {
+//        if (Core != null)
+//        {
+//            Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+//        }
+
+//        base.Disabled();
+//    }
+
+//    private HookResult OnPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
+//    {
+//        CCSPlayerController? damagedPlayer = @event.Userid;
+//        if (damagedPlayer == null || !damagedPlayer.IsValid || !damagedPlayer.PawnIsAlive)
+//        {
+//            return HookResult.Continue;
+//        }
+
+//        GameModifiersUtils.TeleportPlayerToRandomSpot(damagedPlayer);
+//        return HookResult.Continue;
+//    }
+//}
 
 public class GameModifierResetOnReload : GameModifierBase
 {
-    public override string Name => "ResetOnReload";
-    public override string Description => "Players are teleported back to their spawn on reload";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnKill>(),
         GameModifiersUtils.GetModifierName<GameModifierSwapPlacesOnHit>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
-        GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>()
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnReload>(),
+        //GameModifiersUtils.GetModifierName<GameModifierTeleportOnHit>()
     ];
+
+    public GameModifierResetOnReload()
+    {
+        Name = "ResetOnReload";
+        Description = "Players are teleported back to their spawn on reload";
+    }
 
     public override void Enabled()
     {

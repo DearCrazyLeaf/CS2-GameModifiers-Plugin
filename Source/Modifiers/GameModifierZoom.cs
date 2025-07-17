@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using CounterStrikeSharp.API;
@@ -103,24 +102,32 @@ public abstract class GameModifierZoomBase : GameModifierBase
 
 public class GameModifierZoomIn : GameModifierZoomBase
 {
-    public override string Name => "ZoomIn";
-    public override string Description => "Everyone's FOV is set to 30";
-    public override bool SupportsRandomRounds => true;
+    public override bool SupportsRandomRounds => false;
     public override uint Fov { get; protected set; } = 30;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierZoomOut>()
-    ];
+       GameModifiersUtils.GetModifierName<GameModifierZoomOut>()
+   ];
+
+    public GameModifierZoomIn()
+    {
+        Name = "ZoomIn";
+        Description = "Everyone's FOV is set to 30";
+    }
 }
 
 public class GameModifierZoomOut : GameModifierZoomBase
 {
-    public override string Name => "ZoomOut";
-    public override string Description => "Everyone's FOV is set to 150";
-    public override bool SupportsRandomRounds => true;
+    public override bool SupportsRandomRounds => false;
     public override uint Fov { get; protected set; } = 150;
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierZoomIn>()
     ];
+
+    public GameModifierZoomOut()
+    {
+        Name = "ZoomOut";
+        Description = "Everyone's FOV is set to 150";
+    }
 }

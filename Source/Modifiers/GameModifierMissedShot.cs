@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using CounterStrikeSharp.API;
@@ -141,9 +140,13 @@ public abstract class GameModifierMissedShot : GameModifierBase
 
 public class GameModifierDropOnMiss : GameModifierMissedShot
 {
-    public override string Name => "DropOnMiss";
-    public override string Description => "Weapons are dropped on missed shots";
     public override bool SupportsRandomRounds => true;
+
+    public GameModifierDropOnMiss()
+    {
+        Name = "DropOnMiss";
+        Description = "Weapons are dropped on missed shots";
+    }
 
     protected override void OnMissedShot(CCSPlayerController? player)
     {
@@ -158,9 +161,13 @@ public class GameModifierDropOnMiss : GameModifierMissedShot
 
 public class GameModifierDontMiss : GameModifierMissedShot
 {
-    public override string Name => "DontMiss";
-    public override string Description => "You take the damage from your missed shots";
     public override bool SupportsRandomRounds => true;
+
+    public GameModifierDontMiss()
+    {
+        Name = "DontMiss";
+        Description = "You take the damage from your missed shots";
+    }
 
     protected override void OnMissedShot(CCSPlayerController? player)
     {

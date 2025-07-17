@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using CounterStrikeSharp.API;
@@ -29,7 +28,16 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
 
         Utilities.GetPlayers().ForEach(RemoveWeapons);
 
-        GameModifiersUtils.PrintTitleToChatAll("Removing items, they will be returned when the modifier is disabled.");
+        // 使用本地化版本的 PrintTitleToChatAll
+        if (Core != null && Core._localizer != null)
+        {
+            GameModifiersUtils.PrintTitleToChatAll("Removing items, they will be returned when the modifier is disabled.", Core._localizer);
+        }
+        else
+        {
+            // 如果没有本地化器，直接发送消息
+            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers Removing items, they will be returned when the modifier is disabled."));
+        }
     }
 
     public override void Disabled()
@@ -44,7 +52,16 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
             TryReturnWeapons(Utilities.GetPlayerFromSlot(cachedWeaponPair.Key));
         }
         
-        GameModifiersUtils.PrintTitleToChatAll("Returning items...");
+        // 使用本地化版本的 PrintTitleToChatAll
+        if (Core != null && Core._localizer != null)
+        {
+            GameModifiersUtils.PrintTitleToChatAll("Returning items...", Core._localizer);
+        }
+        else
+        {
+            // 如果没有本地化器，直接发送消息
+            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers Returning items..."));
+        }
 
         base.Disabled();
     }
@@ -150,95 +167,132 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
     }
 }
 
-public class GameModifierKnifeOnly : GameModifierRemoveWeapons
-{
-    public override string Name => "KnivesOnly";
-    public override string Description => "Buy menu is disabled, knives only";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>(),
-        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
-    ];
-}
+//public class GameModifierKnifeOnly : GameModifierRemoveWeapons
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>(),
+//        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
+//    ];
 
-public class GameModifierRandomWeapon : GameModifierRemoveWeapons
-{
-    public override string Name => "RandomWeapon";
-    public override string Description => "Buy menu is disabled, random weapon only";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
-    ];
-    
-    public override void Enabled()
-    {
-        base.Enabled();
+//    public GameModifierKnifeOnly()
+//    { 
+//        Name = "KnivesOnly";
+//        Description = "Buy menu is disabled, knives only";
+//    }
+//}
 
-        ApplyRandomWeapon();
-    }
+//public class GameModifierRandomWeapon : GameModifierRemoveWeapons
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
+//    ];
 
-    protected virtual void ApplyRandomWeapon()
-    {
-        string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
-        GameModifiersUtils.PrintTitleToChatAll($"{randomWeaponName.Substring(7)} round.");
+//    public GameModifierRandomWeapon()
+//    {
+//        Name = "RandomWeapon";
+//        Description = "Buy menu is disabled, random weapon only";
+//    }
 
-        Utilities.GetPlayers().ForEach(player =>
-        {
-            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
-        });
-    }
-}
+//    public override void Enabled()
+//    {
+//        base.Enabled();
 
-public class GameModifierRandomWeapons : GameModifierRandomWeapon
-{
-    public override string Name => "RandomWeapons";
-    public override string Description => "Buy menu is disabled, random weapons are given out";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>()
-    ];
+//        ApplyRandomWeapon();
+//    }
 
-    protected override void ApplyRandomWeapon()
-    {
-        Utilities.GetPlayers().ForEach(player =>
-        {
-            string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
-            GameModifiersUtils.PrintTitleToChat(player, $"{randomWeaponName.Substring(7)} for random weapon round.");
-            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
-        });
-    }
-}
+//    protected virtual void ApplyRandomWeapon()
+//    {
+//        string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
+        
+//        // 使用本地化版本的 PrintTitleToChatAll
+//        if (Core != null && Core._localizer != null)
+//        {
+//            GameModifiersUtils.PrintTitleToChatAll($"{randomWeaponName.Substring(7)} round.", Core._localizer);
+//        }
+//        else
+//        {
+//            // 如果没有本地化器，直接发送消息
+//            Utilities.GetPlayers().ForEach(player => player.PrintToChat($"GameModifiers {randomWeaponName.Substring(7)} round."));
+//        }
 
-public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
-{
-    public override string Name => "GrenadesOnly";
-    public override string Description => "Buy menu is disabled, grenades only";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>(),
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
-    ];
+//        Utilities.GetPlayers().ForEach(player =>
+//        {
+//            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
+//        });
+//    }
+//}
 
-    public override void Enabled()
-    {
-        base.Enabled();
+//public class GameModifierRandomWeapons : GameModifierRandomWeapon
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>()
+//    ];
 
-        Utilities.GetPlayers().ForEach(player =>
-        {
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_molotov");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_smokegrenade");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_hegrenade");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_flashbang");
-        });
-    }
-}
+//    public GameModifierRandomWeapons()
+//    {
+//        Name = "RandomWeapons";
+//        Description = "Buy menu is disabled, random weapons are given out";
+//    }
+
+//    protected override void ApplyRandomWeapon()
+//    {
+//        Utilities.GetPlayers().ForEach(player =>
+//        {
+//            string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
+            
+//            // 使用本地化版本的 PrintTitleToChat
+//            if (Core != null && Core._localizer != null)
+//            {
+//                GameModifiersUtils.PrintTitleToChat(player, $"{randomWeaponName.Substring(7)} for random weapon round.", Core._localizer);
+//            }
+//            else
+//            {
+//                // 如果没有本地化器，直接发送消息
+//                player.PrintToChat($"GameModifiers {randomWeaponName.Substring(7)} for random weapon round.");
+//            }
+            
+//            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
+//        });
+//    }
+//}
+
+//public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
+//{
+//    public override bool SupportsRandomRounds => true;
+//   public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>(),
+//        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
+//        GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
+//    ];
+
+//    public GameModifierGrenadesOnly()
+//    {
+//        Name = "GrenadesOnly";
+//        Description = "Buy menu is disabled, grenades only";
+//    }
+
+//    public override void Enabled()
+//    {
+//        base.Enabled();
+
+//        Utilities.GetPlayers().ForEach(player =>
+//        {
+//            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_molotov");
+//            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_smokegrenade");
+//            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_hegrenade");
+//            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_flashbang");
+//        });
+//    }
+//}

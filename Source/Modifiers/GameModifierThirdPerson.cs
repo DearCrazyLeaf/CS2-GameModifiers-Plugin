@@ -1,152 +1,156 @@
-﻿using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using CounterStrikeSharp.API;
-using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Entities.Constants;
-using CounterStrikeSharp.API.Modules.Utils;
-using GameModifiers.ThirdParty;
+﻿//using System.Collections.Generic;
+//using System.Drawing;
+//using System.Linq;
+//using CounterStrikeSharp.API;
+//using CounterStrikeSharp.API.Core;
+//using CounterStrikeSharp.API.Modules.Entities.Constants;
+//using CounterStrikeSharp.API.Modules.Utils;
+//using GameModifiers.ThirdParty;
 
-namespace GameModifiers.Modifiers;
+//namespace GameModifiers.Modifiers;
 
-public class GameModifierThirdPerson : GameModifierBase
-{
-    public override string Name => "ThirdPerson";
-    public override string Description => "Everyone is in third person view";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierZoomIn>(),
-        GameModifiersUtils.GetModifierName<GameModifierZoomOut>()
-    ];
-    private readonly Dictionary<int, CPhysicsPropMultiplayer> _thirdPersonAttachPointInstances = new();
+//public class GameModifierThirdPerson : GameModifierBase
+//{
+//    public override bool SupportsRandomRounds => false;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierZoomIn>(),
+//        GameModifiersUtils.GetModifierName<GameModifierZoomOut>()
+//    ];
+//    private readonly Dictionary<int, CPhysicsPropMultiplayer> _thirdPersonAttachPointInstances = new();
 
-    public override void Enabled()
-    {
-        base.Enabled();
+//    public GameModifierThirdPerson()
+//    {
+//        Name = "ThirdPerson";
+//        Description = "Everyone is in third person view";
+//    }
 
-        if (Core != null)
-        {
-            Core.RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
-            Core.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
-            Core.RegisterListener<Listeners.OnTick>(OnTick);
-        }
+//    public override void Enabled()
+//    {
+//        base.Enabled();
 
-        Utilities.GetPlayers().ForEach(ApplyThirdPersonToPlayer);
-    }
+//        if (Core != null)
+//        {
+//            Core.RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
+//            Core.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+//            Core.RegisterListener<Listeners.OnTick>(OnTick);
+//        }
 
-    public override void Disabled()
-    {
-        if (Core != null)
-        {
-            Core.DeregisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
-            Core.RemoveListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
-            Core.RemoveListener<Listeners.OnTick>(OnTick);
-        }
+//        Utilities.GetPlayers().ForEach(ApplyThirdPersonToPlayer);
+//    }
 
-        Utilities.GetPlayers().ForEach(ApplyFirstPersonToPlayer);
+//    public override void Disabled()
+//    {
+//        if (Core != null)
+//        {
+//            Core.DeregisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
+//            Core.RemoveListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+//            Core.RemoveListener<Listeners.OnTick>(OnTick);
+//        }
 
-        base.Disabled();
-    }
+//        Utilities.GetPlayers().ForEach(ApplyFirstPersonToPlayer);
 
-    private void ApplyThirdPersonToPlayer(CCSPlayerController? player)
-    {
-        if (player == null || !player.IsValid || !player.PawnIsAlive)
-        {
-            return;
-        }
+//        base.Disabled();
+//    }
 
-        CCSPlayerPawn? playerPawn = player.PlayerPawn.Value;
-        if (playerPawn == null || !playerPawn.IsValid)
-        {
-            return;
-        }
+//    private void ApplyThirdPersonToPlayer(CCSPlayerController? player)
+//    {
+//        if (player == null || !player.IsValid || !player.PawnIsAlive)
+//        {
+//            return;
+//        }
 
-        CPhysicsPropMultiplayer? thirdPersonAttachPoint = Utilities.CreateEntityByName<CPhysicsPropMultiplayer>("prop_physics_multiplayer");
-        if (thirdPersonAttachPoint == null || !thirdPersonAttachPoint.IsValid)
-        {
-            return;
-        }
+//        CCSPlayerPawn? playerPawn = player.PlayerPawn.Value;
+//        if (playerPawn == null || !playerPawn.IsValid)
+//        {
+//            return;
+//        }
 
-        thirdPersonAttachPoint.DispatchSpawn();
+//        CPhysicsPropMultiplayer? thirdPersonAttachPoint = Utilities.CreateEntityByName<CPhysicsPropMultiplayer>("prop_physics_multiplayer");
+//        if (thirdPersonAttachPoint == null || !thirdPersonAttachPoint.IsValid)
+//        {
+//            return;
+//        }
 
-        thirdPersonAttachPoint.Collision.CollisionGroup = (byte)CollisionGroup.COLLISION_GROUP_NEVER;
-        thirdPersonAttachPoint.Collision.SolidFlags = 12;
-        thirdPersonAttachPoint.Collision.SolidType = SolidType_t.SOLID_VPHYSICS;
-        thirdPersonAttachPoint.Render = Color.Transparent;
+//        thirdPersonAttachPoint.DispatchSpawn();
 
-        playerPawn.CameraServices!.ViewEntity.Raw = thirdPersonAttachPoint.EntityHandle.Raw;
-        Utilities.SetStateChanged(playerPawn, "CBasePlayerPawn", "m_pCameraServices");
+//        thirdPersonAttachPoint.Collision.CollisionGroup = (byte)CollisionGroup.COLLISION_GROUP_NEVER;
+//        thirdPersonAttachPoint.Collision.SolidFlags = 12;
+//        thirdPersonAttachPoint.Collision.SolidType = SolidType_t.SOLID_VPHYSICS;
+//        thirdPersonAttachPoint.Render = Color.Transparent;
 
-        thirdPersonAttachPoint.Teleport(player.CalculatePositionInFront(-110, 90),
-            playerPawn.V_angle, new Vector());
+//        playerPawn.CameraServices!.ViewEntity.Raw = thirdPersonAttachPoint.EntityHandle.Raw;
+//        Utilities.SetStateChanged(playerPawn, "CBasePlayerPawn", "m_pCameraServices");
 
-        _thirdPersonAttachPointInstances.Add(player.Slot, thirdPersonAttachPoint);
-    }
+//        thirdPersonAttachPoint.Teleport(player.CalculatePositionInFront(-110, 90),
+//            playerPawn.V_angle, new Vector());
 
-    private void ApplyFirstPersonToPlayer(CCSPlayerController? player)
-    {
-        if (player == null || !player.IsValid)
-        {
-            return;
-        }
+//        _thirdPersonAttachPointInstances.Add(player.Slot, thirdPersonAttachPoint);
+//    }
 
-        var playerPawn = player.PlayerPawn.Value;
-        if (playerPawn == null || !playerPawn.IsValid)
-        {
-            return;
-        }
+//    private void ApplyFirstPersonToPlayer(CCSPlayerController? player)
+//    {
+//        if (player == null || !player.IsValid)
+//        {
+//            return;
+//        }
 
-        playerPawn.CameraServices!.ViewEntity.Raw = uint.MaxValue;
-        Utilities.SetStateChanged(playerPawn, "CBasePlayerPawn", "m_pCameraServices");
+//        var playerPawn = player.PlayerPawn.Value;
+//        if (playerPawn == null || !playerPawn.IsValid)
+//        {
+//            return;
+//        }
 
-        if (_thirdPersonAttachPointInstances.ContainsKey(player.Slot))
-        {
-            _thirdPersonAttachPointInstances[player.Slot].Remove();
-            _thirdPersonAttachPointInstances.Remove(player.Slot);
-        }
-    }
+//        playerPawn.CameraServices!.ViewEntity.Raw = uint.MaxValue;
+//        Utilities.SetStateChanged(playerPawn, "CBasePlayerPawn", "m_pCameraServices");
 
-    private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
-    {
-        var player = @event.Userid;
-        if (player == null || player.IsValid == false || player.Connected != PlayerConnectedState.PlayerConnected)
-        {
-            return HookResult.Continue;
-        }
+//        if (_thirdPersonAttachPointInstances.ContainsKey(player.Slot))
+//        {
+//            _thirdPersonAttachPointInstances[player.Slot].Remove();
+//            _thirdPersonAttachPointInstances.Remove(player.Slot);
+//        }
+//    }
 
-        ApplyFirstPersonToPlayer(player);
-        return HookResult.Continue;
-    }
+//    private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+//    {
+//        var player = @event.Userid;
+//        if (player == null || player.IsValid == false || player.Connected != PlayerConnectedState.PlayerConnected)
+//        {
+//            return HookResult.Continue;
+//        }
 
-    private void OnClientDisconnect(int slot)
-    {
-        CCSPlayerController? player = Utilities.GetPlayerFromSlot(slot);
-        if (player == null || !player.IsValid)
-        {
-            if (_thirdPersonAttachPointInstances.ContainsKey(slot))
-            {
-                _thirdPersonAttachPointInstances[slot].Remove();
-                _thirdPersonAttachPointInstances.Remove(slot);
-            }
+//        ApplyFirstPersonToPlayer(player);
+//        return HookResult.Continue;
+//    }
 
-            return;
-        }
+//    private void OnClientDisconnect(int slot)
+//    {
+//        CCSPlayerController? player = Utilities.GetPlayerFromSlot(slot);
+//        if (player == null || !player.IsValid)
+//        {
+//            if (_thirdPersonAttachPointInstances.ContainsKey(slot))
+//            {
+//                _thirdPersonAttachPointInstances[slot].Remove();
+//                _thirdPersonAttachPointInstances.Remove(slot);
+//            }
 
-        ApplyFirstPersonToPlayer(player);
-    }
+//            return;
+//        }
 
-    private void OnTick()
-    {
-        foreach (var attachPointPair in _thirdPersonAttachPointInstances)
-        {
-            CCSPlayerController? player = Utilities.GetPlayerFromSlot(attachPointPair.Key);
-            if (player == null || !player.IsValid || !player.PawnIsAlive)
-            {
-                continue;
-            }
+//        ApplyFirstPersonToPlayer(player);
+//    }
 
-            attachPointPair.Value.UpdateCameraSmooth(player);
-        }
-    }
-}
+//    private void OnTick()
+//    {
+//        foreach (var attachPointPair in _thirdPersonAttachPointInstances)
+//        {
+//            CCSPlayerController? player = Utilities.GetPlayerFromSlot(attachPointPair.Key);
+//            if (player == null || !player.IsValid || !player.PawnIsAlive)
+//            {
+//                continue;
+//            }
+
+//            attachPointPair.Value.UpdateCameraSmooth(player);
+//        }
+//    }
+//}

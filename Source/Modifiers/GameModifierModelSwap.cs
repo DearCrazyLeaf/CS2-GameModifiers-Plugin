@@ -137,56 +137,19 @@ public abstract class GameModifierModelSwap : GameModifierBase
     }
 }
 
-public class GameModifierTeamModelSwap : GameModifierModelSwap
-{
-    public override string Name => "TeamModelSwap";
-    public override string Description => "Switches player models for both sides";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierWhosWho>(),
-        GameModifiersUtils.GetModifierName<GameModifierImposters>()
-    ];
-
-    protected override void ApplyPlayerModel(CCSPlayerController? player)
-    {
-        if (player != null && player.IsValid)
-        {
-            CsTeam otherTeam = player.Team == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
-            SetPlayerModel(player, otherTeam);
-        }
-    }
-}
-
-public class GameModifierWhosWho : GameModifierModelSwap
-{
-    public override string Name => "WhosWho";
-    public override string Description => "Random player models for both sides";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierTeamModelSwap>(),
-        GameModifiersUtils.GetModifierName<GameModifierImposters>()
-    ];
-
-    protected override void ApplyPlayerModel(CCSPlayerController? player)
-    {
-        Random random = new Random();
-        SetPlayerModel(player, (CsTeam)random.Next(2, 4));
-    }
-}
-
 public class GameModifierImposters : GameModifierModelSwap
 {
-    public override string Name => "Imposters";
-    public override string Description => "A random player for each team has swapped sides";
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierTeamModelSwap>(),
-        GameModifiersUtils.GetModifierName<GameModifierWhosWho>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomSpawn>()
+        //GameModifiersUtils.GetModifierName<GameModifierRandomSpawn>()
     ];
+
+    public GameModifierImposters()
+    {
+        Name = "Imposters";
+        Description = "A random player for each team has swapped sides";
+    }
 
     private readonly Dictionary<int, string> _cachedPlayerNames = new();
 
@@ -204,7 +167,16 @@ public class GameModifierImposters : GameModifierModelSwap
             Utilities.SetStateChanged(player, "CBasePlayerController", "m_iszPlayerName");
         });
 
-        GameModifiersUtils.PrintTitleToChatAll("All names have been randomized for the imposter modifier!");
+        // 使用本地化版本的 PrintTitleToChatAll
+        if (Core != null && Core._localizer != null)
+        {
+            GameModifiersUtils.PrintTitleToChatAll("All names have been randomized for the imposter modifier!", Core._localizer);
+        }
+        else
+        {
+            // 如果没有本地化器，直接发送消息
+            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers All names have been randomized for the imposter modifier!"));
+        }
     }
 
     protected override void DeactivateSwap()
@@ -218,7 +190,16 @@ public class GameModifierImposters : GameModifierModelSwap
             }
         });
 
-        GameModifiersUtils.PrintTitleToChatAll("All names have been put back to normal!");
+        // 使用本地化版本的 PrintTitleToChatAll
+        if (Core != null && Core._localizer != null)
+        {
+            GameModifiersUtils.PrintTitleToChatAll("All names have been put back to normal!", Core._localizer);
+        }
+        else
+        {
+            // 如果没有本地化器，直接发送消息
+            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers All names have been put back to normal!"));
+        }
         _cachedPlayerNames.Clear();
     }
 

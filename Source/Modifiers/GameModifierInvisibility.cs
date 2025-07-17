@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -154,70 +153,82 @@ public abstract class GameModifierInvisibleBase : GameModifierBase
     }
 }
 
-public class GameModifierCloaked : GameModifierInvisibleBase
-{
-    public override string Name => "Cloaked";
-    public override string Description => "Everyone is invisible";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>()
-    ];
-    
-    protected override bool CheckHidePlayer(CCSPlayerController player)
-    {
-        return true;
-    }
-}
+//public class GameModifierCloaked : GameModifierInvisibleBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
+//        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>()
+//    ];
 
-public class GameModifierRandomCloak : GameModifierInvisibleBase
-{
-    public override string Name => "RandomCloak";
-    public override string Description => "Everyone has a random chance to be invisible";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>()
-    ];
+//    public GameModifierCloaked()
+//    {
+//        Name = "Cloaked";
+//        Description = "Everyone is invisible";
+//    }
     
-    protected override bool CheckHidePlayer(CCSPlayerController player)
-    {
-        if (Random.Shared.Next(0, 2) == 0)
-        {
-            return false;
-        }
+//    protected override bool CheckHidePlayer(CCSPlayerController player)
+//    {
+//        return true;
+//    }
+//}
+
+//public class GameModifierRandomCloak : GameModifierInvisibleBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+//        GameModifiersUtils.GetModifierName<GameModifierSingleCloak>()
+//    ];
+
+//    public GameModifierRandomCloak()
+//    {
+//        Name = "RandomCloak";
+//        Description = "Everyone has a random chance to be invisible";
+//    }
+    
+//    protected override bool CheckHidePlayer(CCSPlayerController player)
+//    {
+//        if (Random.Shared.Next(0, 2) == 0)
+//        {
+//            return false;
+//        }
         
-        return true;
-    }
-}
+//        return true;
+//    }
+//}
 
-public class GameModifierSingleCloak : GameModifierInvisibleBase
-{
-    public override string Name => "SingleCloak";
-    public override string Description => "Each team has an invisible player";
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>()
-    ];
+//public class GameModifierSingleCloak : GameModifierInvisibleBase
+//{
+//    public override bool SupportsRandomRounds => true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+//        GameModifiersUtils.GetModifierName<GameModifierRandomCloak>()
+//    ];
+
+//    public GameModifierSingleCloak()
+//    {
+//        Name = "SingleCloak";
+//        Description = "Each team has an invisible player";
+//    }
     
-    protected override void HidePlayers()
-    {
-        CachedHiddenPlayers.Clear();
+//    protected override void HidePlayers()
+//    {
+//        CachedHiddenPlayers.Clear();
         
-        List<CCSPlayerController> terroristPlayers = GameModifiersUtils.GetTerroristPlayers();
-        if (terroristPlayers.Any())
-        {
-            CachedHiddenPlayers.Add(terroristPlayers[Random.Shared.Next(terroristPlayers.Count)].Slot);
-        }
+//        List<CCSPlayerController> terroristPlayers = GameModifiersUtils.GetTerroristPlayers();
+//        if (terroristPlayers.Any())
+//        {
+//            CachedHiddenPlayers.Add(terroristPlayers[Random.Shared.Next(terroristPlayers.Count)].Slot);
+//        }
 
-        List<CCSPlayerController> counterTerroristPlayers = GameModifiersUtils.GetCounterTerroristPlayers();
-        if (counterTerroristPlayers.Any())
-        {
-            CachedHiddenPlayers.Add(counterTerroristPlayers[Random.Shared.Next(counterTerroristPlayers.Count)].Slot);
-        }
-    }
-}
+//        List<CCSPlayerController> counterTerroristPlayers = GameModifiersUtils.GetCounterTerroristPlayers();
+//        if (counterTerroristPlayers.Any())
+//        {
+//            CachedHiddenPlayers.Add(counterTerroristPlayers[Random.Shared.Next(counterTerroristPlayers.Count)].Slot);
+//        }
+//    }
+//}
