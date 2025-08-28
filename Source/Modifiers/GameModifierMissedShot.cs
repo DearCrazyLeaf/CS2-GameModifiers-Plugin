@@ -138,61 +138,61 @@ public abstract class GameModifierMissedShot : GameModifierBase
     }
 }
 
-public class GameModifierDropOnMiss : GameModifierMissedShot
-{
-    public override bool SupportsRandomRounds => true;
+//public class GameModifierDropOnMiss : GameModifierMissedShot
+//{
+//    public override bool SupportsRandomRounds => true;
 
-    public GameModifierDropOnMiss()
-    {
-        Name = "DropOnMiss";
-        Description = "Weapons are dropped on missed shots";
-    }
+//    public GameModifierDropOnMiss()
+//    {
+//        Name = "DropOnMiss";
+//        Description = "Weapons are dropped on missed shots";
+//    }
 
-    protected override void OnMissedShot(CCSPlayerController? player)
-    {
-        if (player == null || player.IsValid == false || !player.PawnIsAlive)
-        {
-            return;
-        }
+//    protected override void OnMissedShot(CCSPlayerController? player)
+//    {
+//        if (player == null || player.IsValid == false || !player.PawnIsAlive)
+//        {
+//            return;
+//        }
 
-        player.DropActiveWeapon();
-    }
-}
+//        player.DropActiveWeapon();
+//    }
+//}
 
-public class GameModifierDontMiss : GameModifierMissedShot
-{
-    public override bool SupportsRandomRounds => true;
+//public class GameModifierDontMiss : GameModifierMissedShot
+//{
+//    public override bool SupportsRandomRounds => true;
 
-    public GameModifierDontMiss()
-    {
-        Name = "DontMiss";
-        Description = "You take the damage from your missed shots";
-    }
+//    public GameModifierDontMiss()
+//    {
+//        Name = "DontMiss";
+//        Description = "You take the damage from your missed shots";
+//    }
 
-    protected override void OnMissedShot(CCSPlayerController? player)
-    {
-        if (player == null || player.IsValid == false || !player.PawnIsAlive)
-        {
-            return;
-        }
+//    protected override void OnMissedShot(CCSPlayerController? player)
+//    {
+//        if (player == null || player.IsValid == false || !player.PawnIsAlive)
+//        {
+//            return;
+//        }
 
-        int damage = (int)GameModifiersUtils.GetWeaponDamage(GameModifiersUtils.GetActiveWeapon(player));
-        if (damage <= 0.0f)
-        {
-            return;
-        }
+//        int damage = (int)GameModifiersUtils.GetWeaponDamage(GameModifiersUtils.GetActiveWeapon(player));
+//        if (damage <= 0.0f)
+//        {
+//            return;
+//        }
 
-        var playerPawn = player.PlayerPawn.Value;
-        if (playerPawn == null || !playerPawn.IsValid)
-        {
-            return;
-        }
+//        var playerPawn = player.PlayerPawn.Value;
+//        if (playerPawn == null || !playerPawn.IsValid)
+//        {
+//            return;
+//        }
 
-        int newHealth = playerPawn.Health - damage < 0 ? 0 : playerPawn.Health - damage;
-        GameModifiersUtils.SetPlayerHealth(playerPawn, newHealth);
-        if (newHealth <= 0)
-        {
-            playerPawn.CommitSuicide(false, true);
-        }
-    }
-}
+//        int newHealth = playerPawn.Health - damage < 0 ? 0 : playerPawn.Health - damage;
+//        GameModifiersUtils.SetPlayerHealth(playerPawn, newHealth);
+//        if (newHealth <= 0)
+//        {
+//            playerPawn.CommitSuicide(false, true);
+//        }
+//    }
+//}
