@@ -111,6 +111,8 @@ public class GameModifierOnePerMag : GameModifierWeapon
         "InfiniteAmmo"
     ];
     private readonly Dictionary<string, int> _cachedMaxClip1 = new();
+    // Cache the VData references so we can restore even if no weapon entity still exists when disabled.
+    private readonly Dictionary<string, CCSWeaponBaseVData?> _cachedVDataRefs = new();
 
     public GameModifierOnePerMag()
     {
@@ -134,7 +136,10 @@ public class GameModifierOnePerMag : GameModifierWeapon
         if (!_cachedMaxClip1.ContainsKey(weapon.DesignerName))
         {
             _cachedMaxClip1.Add(weapon.DesignerName, weaponVData.MaxClip1);
-            
+            if (!_cachedVDataRefs.ContainsKey(weapon.DesignerName))
+            {
+                _cachedVDataRefs.Add(weapon.DesignerName, weaponVData);
+            }
             Server.NextFrame(() =>
             {
                 weaponVData.MaxClip1 = 1;
@@ -181,6 +186,23 @@ public class GameModifierOnePerMag : GameModifierWeapon
             GameModifiersUtils.ResetWeaponAmmo(weapon);
         });
     }
+
+    public override void Disabled()
+    {
+        // Restore any remaining weapon types whose entities no longer exist (never passed through RemoveWeaponModifier).
+        foreach (var pair in _cachedMaxClip1.ToList())
+        {
+            string designerName = pair.Key;
+            int original = pair.Value;
+            if (_cachedVDataRefs.TryGetValue(designerName, out var vdata) && vdata != null)
+            {
+                vdata.MaxClip1 = original;
+            }
+            _cachedMaxClip1.Remove(designerName);
+        }
+        _cachedVDataRefs.Clear();
+        base.Disabled();
+    }
 }
 
 public class GameModifierOneInTheChamber : GameModifierWeapon
@@ -198,6 +220,8 @@ public class GameModifierOneInTheChamber : GameModifierWeapon
         Description = "1 bullet per kill, pistols one hit";
     }
 
+    private Guid _dispatcherId = Guid.Empty;
+
     public override void Enabled()
     {
         base.Enabled();
@@ -206,8 +230,10 @@ public class GameModifierOneInTheChamber : GameModifierWeapon
         {
             Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         }
-        
-        VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Hook(OnTakeDamage, HookMode.Pre);
+        if (_dispatcherId == Guid.Empty)
+        {
+            _dispatcherId = DamageHookDispatcher.Add(OnGlobalDamage);
+        }
     }
 
     public override void Disabled()
@@ -216,10 +242,19 @@ public class GameModifierOneInTheChamber : GameModifierWeapon
         {
             Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         }
-        
-        VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Unhook(OnTakeDamage, HookMode.Pre);
+        if (_dispatcherId != Guid.Empty)
+        {
+            DamageHookDispatcher.Remove(_dispatcherId);
+            _dispatcherId = Guid.Empty;
+        }
 
         base.Disabled();
+    }
+
+    private void OnGlobalDamage(CTakeDamageInfo info)
+    {
+        // Multiply all damage (applies globally while active)
+        info.Damage *= 10.0f;
     }
 
     protected override bool ApplyWeaponModifier(CBasePlayerWeapon? weapon)
@@ -268,13 +303,6 @@ public class GameModifierOneInTheChamber : GameModifierWeapon
     private HookResult OnPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
     {
         AddBullet(@event.Attacker, @event.Weapon);
-        return HookResult.Continue;
-    }
-    
-    private HookResult OnTakeDamage(DynamicHook hook)
-    {
-        CTakeDamageInfo damageInfo = hook.GetParam<CTakeDamageInfo>(1);
-        damageInfo.Damage *= 10.0f;
         return HookResult.Continue;
     }
 }

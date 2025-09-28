@@ -9,24 +9,22 @@ namespace GameModifiers.Modifiers;
 public abstract class GameModifierVelocity : GameModifierBase
 {
     public virtual float SpeedMultiplier { get; protected set; } = 1.0f;
-    private Timer? _speedTimer = null;
+    private Timer? _verifyTimer;
 
     public override void Enabled()
     {
         base.Enabled();
-
         if (Core != null)
         {
             Core.RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-            Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         }
-
-        Utilities.GetPlayers().ForEach(controller =>
+        var players = Utilities.GetPlayers();
+        foreach (var controller in players)
         {
-            GameModifiersUtils.SetPlayerSpeedMultiplier(controller, SpeedMultiplier);
-        });
-
-        _speedTimer = new Timer(0.2f, OnSpeedTimer, TimerFlags.REPEAT);
+            ApplySpeed(controller, force:true);
+        }
+        // 低频校验：每2秒检查一次，只有被外部改掉才写回，减少无谓状态同步
+        _verifyTimer = new Timer(2.0f, VerifySpeeds, TimerFlags.REPEAT);
     }
 
     public override void Disabled()
@@ -34,29 +32,44 @@ public abstract class GameModifierVelocity : GameModifierBase
         if (Core != null)
         {
             Core.DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-            Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         }
-
-        Utilities.GetPlayers().ForEach(controller =>
+        _verifyTimer?.Kill();
+        _verifyTimer = null;
+        var players = Utilities.GetPlayers();
+        foreach (var controller in players)
         {
-            GameModifiersUtils.SetPlayerSpeedMultiplier(controller, 1.0f);
-        });
-
-        if (_speedTimer != null)
-        {
-            _speedTimer.Kill();
-            _speedTimer = null;
+            ResetSpeed(controller);
         }
-
         base.Disabled();
     }
 
-    private void OnSpeedTimer()
+    private void VerifySpeeds()
     {
-        Utilities.GetPlayers().ForEach(controller =>
+        var players = Utilities.GetPlayers();
+        foreach (var controller in players)
+        {
+            ApplySpeed(controller, force:false);
+        }
+    }
+
+    private void ApplySpeed(CCSPlayerController? controller, bool force)
+    {
+        if (controller == null || !controller.IsValid) return;
+        float current = GameModifiersUtils.GetPlayerSpeedMultiplier(controller);
+        if (force || System.Math.Abs(current - SpeedMultiplier) > 0.01f)
         {
             GameModifiersUtils.SetPlayerSpeedMultiplier(controller, SpeedMultiplier);
-        });
+        }
+    }
+
+    private void ResetSpeed(CCSPlayerController? controller)
+    {
+        if (controller == null || !controller.IsValid) return;
+        float current = GameModifiersUtils.GetPlayerSpeedMultiplier(controller);
+        if (System.Math.Abs(current - 1.0f) > 0.01f)
+        {
+            GameModifiersUtils.SetPlayerSpeedMultiplier(controller, 1.0f);
+        }
     }
 
     private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
@@ -66,20 +79,7 @@ public abstract class GameModifierVelocity : GameModifierBase
         {
             return HookResult.Continue;
         }
-
-        GameModifiersUtils.SetPlayerSpeedMultiplier(player, SpeedMultiplier);
-        return HookResult.Continue;
-    }
-
-    private HookResult OnPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
-    {
-        var player = @event.Userid;
-        if (player == null || player.IsValid == false || player.Connected != PlayerConnectedState.PlayerConnected)
-        {
-            return HookResult.Continue;
-        }
-
-        GameModifiersUtils.SetPlayerSpeedMultiplier(player, SpeedMultiplier);
+        ApplySpeed(player, force:true);
         return HookResult.Continue;
     }
 }

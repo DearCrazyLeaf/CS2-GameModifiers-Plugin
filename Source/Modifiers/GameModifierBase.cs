@@ -6,11 +6,9 @@ namespace GameModifiers.Modifiers;
 
 public abstract class GameModifierBase
 {
-    // 私有字段存储默认值
     private string _defaultName = "Unnamed";
     private string _defaultDescription = "";
 
-    // 本地化的 Name 属性
     public virtual string Name
     {
         get
@@ -28,7 +26,6 @@ public abstract class GameModifierBase
         protected set { _defaultName = value; }
     }
 
-    // 本地化的 Description 属性
     public virtual string Description
     {
         get
@@ -49,7 +46,7 @@ public abstract class GameModifierBase
     public virtual bool SupportsRandomRounds { get; protected set; } = false;
     public virtual bool IsRegistered { get; protected set; } = true;
     public virtual bool IsActive { get; protected set; } = false;
-    public virtual HashSet<string> IncompatibleModifiers { get; protected set; } = new HashSet<string>();
+    public virtual HashSet<string> IncompatibleModifiers { get; protected set; } = new();
     public GameModifiersCore? Core { get; protected set; } = null;
     public ModifierConfig? Config { get; protected set; } = null;
     protected IStringLocalizer? Localizer => Core?._localizer;
@@ -60,11 +57,9 @@ public abstract class GameModifierBase
         {
             return;
         }
-
         Core = core;
-
         var pluginConfigPath = Path.Combine(GameModifiersUtils.GetPluginPath(core.ModulePath), "ModifierConfig");
-        if (TryParseConfigPath(pluginConfigPath) == false)
+        if (!TryParseConfigPath(pluginConfigPath))
         {
             var configPath = Path.Combine(GameModifiersUtils.GetConfigPath(core.ModulePath), "ModifierConfig");
             TryParseConfigPath(configPath);
@@ -79,21 +74,13 @@ public abstract class GameModifierBase
     public virtual void Enabled()
     {
         IsActive = true;
-
-        if (Config != null)
-        {
-            Config.ApplyConfig();
-        }
+        Config?.ApplyConfig();
     }
 
     public virtual void Disabled()
     {
         IsActive = false;
-
-        if (Config != null)
-        {
-            Config.RemoveConfig();
-        }
+        Config?.RemoveConfig();
     }
 
     public bool CheckIfIncompatible(GameModifierBase? modifier)
@@ -102,7 +89,6 @@ public abstract class GameModifierBase
         {
             return false;
         }
-
         return IncompatibleModifiers.Contains(modifier._defaultName);
     }
 
@@ -113,12 +99,11 @@ public abstract class GameModifierBase
 
     private bool TryParseConfigPath(string path)
     {
-        if (Directory.Exists(path) == false)
+        if (!Directory.Exists(path))
         {
             Directory.CreateDirectory(path);
             return false;
         }
-
         var configFiles = Directory.GetFiles(path, "*.cfg");
         foreach (var configFile in configFiles)
         {
@@ -130,11 +115,9 @@ public abstract class GameModifierBase
                     Config = tempConfig;
                     return true;
                 }
-
                 break;
             }
         }
-
         return false;
     }
 }

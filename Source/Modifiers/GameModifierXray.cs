@@ -186,29 +186,29 @@ public abstract class GameModifierXrayBase : GameModifierBase
     }
 }
 
-public class GameModifierXrayAll : GameModifierXrayBase
-{
-    public override bool SupportsRandomRounds { get; protected set; } = true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
-        //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
-        //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierXrayRandom>(),
-        GameModifiersUtils.GetModifierName<GameModifierXraySingle>()
-    ];
+//public class GameModifierXrayAll : GameModifierXrayBase
+//{
+//    public override bool SupportsRandomRounds { get; protected set; } = true;
+//    public override HashSet<string> IncompatibleModifiers =>
+//    [
+//        //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
+//        //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
+//        //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
+//        GameModifiersUtils.GetModifierName<GameModifierXrayRandom>(),
+//        GameModifiersUtils.GetModifierName<GameModifierXraySingle>()
+//    ];
 
-    public GameModifierXrayAll()
-    {
-        Name = "Xray";
-        Description = "Everyone can see each other through walls";
-    }
+//    public GameModifierXrayAll()
+//    {
+//        Name = "Xray";
+//        Description = "Everyone can see each other through walls";
+//    }
     
-    protected override bool CheckEnableXray(CCSPlayerController player)
-    {
-        return true;
-    }
-}
+//    protected override bool CheckEnableXray(CCSPlayerController player)
+//    {
+//        return true;
+//    }
+//}
 
 public class GameModifierXrayRandom : GameModifierXrayBase
 {
@@ -218,7 +218,7 @@ public class GameModifierXrayRandom : GameModifierXrayBase
         //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
         //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
         //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
+        //GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
         GameModifiersUtils.GetModifierName<GameModifierXraySingle>()
     ];
 
@@ -247,7 +247,7 @@ public class GameModifierXraySingle : GameModifierXrayBase
         //GameModifiersUtils.GetModifierName<GameModifierCloaked>(),
         //GameModifiersUtils.GetModifierName<GameModifierRandomCloak>(),
         //GameModifiersUtils.GetModifierName<GameModifierSingleCloak>(),
-        GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
+        //GameModifiersUtils.GetModifierName<GameModifierXrayAll>(),
         GameModifiersUtils.GetModifierName<GameModifierXrayRandom>()
     ];
 

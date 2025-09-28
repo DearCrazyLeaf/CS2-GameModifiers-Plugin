@@ -38,7 +38,6 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     public void OnConfigParsed(GameModifiersConfig config)
     {
         Config = config;
-
         _minRandomRounds = config.MinRandomRounds;
         _maxRandomRounds = config.MaxRandomRounds;
     }
@@ -46,24 +45,19 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     public override void Load(bool hotReload)
     {
         base.Load(hotReload);
-
         Initialise();
-
         Console.WriteLine("[GameModifiers::Load] Successfully loaded!");
     }
 
     public override void Unload(bool hotReload)
     {
         RemoveAllModifiers();
-
         foreach (GameModifierBase? modifier in RegisteredModifiers)
         {
             modifier.Unregistered(this);
         }
-
         LastActiveModifiers.Clear();
         RegisteredModifiers.Clear();
-
         base.Unload(hotReload);
     }
 
@@ -72,18 +66,15 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         InitialiseModifiers();
         InitialiseCvarModifiers();
 
-        // Verify modifier names as they are treated as keys in some commands and should be unique!
-        List<string> registeredModifierNames = new List<string>();
+        List<string> registeredModifierNames = new();
         foreach (GameModifierBase? modifier in RegisteredModifiers)
         {
             modifier.Registered(this);
-
             if (registeredModifierNames.Contains(modifier.Name))
             {
                 Console.WriteLine($"[GameModifiers::Initialise] WARNING: Found duplicate modifier name entry for {modifier.Name} all modifier names should be unique!");
                 continue;
             }
-
             registeredModifierNames.Add(modifier.Name);
         }
         
@@ -103,14 +94,12 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     private void InitialiseModifiers()
     {
         RegisteredModifiers.Clear();
-
         List<Type> modifierTypes = GameModifiersUtils.GetAllChildClasses<GameModifierBase>();
         if (!modifierTypes.Any())
         {
             Console.WriteLine("[GameModifiers::InitialiseModifiers] No implemented modifiers found!");
             return;
         }
-
         foreach (Type modifierType in modifierTypes)
         {
             GameModifierBase modifierInstance = (GameModifierBase)Activator.CreateInstance(modifierType)!;
@@ -130,25 +119,21 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     {
         var configPath = Path.Combine(GameModifiersUtils.GetConfigPath(ModulePath), "ConVarModifiers");
         var pluginPath = Path.Combine(GameModifiersUtils.GetPluginPath(ModulePath), "ConVarModifiers");
-
         ParseFileForCvarModifiers(configPath);
         ParseFileForCvarModifiers(pluginPath);
     }
 
     public void ParseFileForCvarModifiers(string configFolderPath)
     {
-        if (Directory.Exists(configFolderPath) == false)
+        if (!Directory.Exists(configFolderPath))
         {
             Directory.CreateDirectory(configFolderPath);
             return;
         }
-
         var configFiles = Directory.GetFiles(configFolderPath, "*.cfg");
-
         foreach (var configFile in configFiles)
         {
-            GameModifierCvar cvarModifierInstance = new GameModifierCvar();
-
+            GameModifierCvar cvarModifierInstance = new();
             if (cvarModifierInstance.ParseConfigFile(configFile))
             {
                 if (!Config.DisabledModifiers.Contains(cvarModifierInstance.Name))
@@ -457,9 +442,7 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
                 GameModifiersUtils.PrintTitleToChatAll(_localizer["No registered modifiers found! Skipping random round..."], _localizer);
                 return HookResult.Continue;
             }
-            
             RemoveAllModifiers();
-            
             if (Config.DisableRandomRoundsInWarmup && GameModifiersUtils.IsWarmupActive())
             {
                 GameModifiersUtils.PrintTitleToChatAll(_localizer["Random rounds will start after warmup period..."], _localizer);
@@ -471,15 +454,8 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         }
         else
         {
-            // Re-apply all active modifiers on round start to ensure
-            // everything is correctly set-up that could have been reset since last round.
-            foreach (GameModifierBase? modifier in ActiveModifiers)
-            {
-                modifier.Disabled();
-                modifier.Enabled();
-            }
+            // 所有 modifier 仅持续一个回合，不再做回合刷新操作
         }
-
         return HookResult.Continue;
     }
 
@@ -490,7 +466,6 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
         {
             RemoveAllModifiers();
         }
-
         return HookResult.Continue;
     }
 
@@ -554,21 +529,17 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
     public void ToggleRandomRounds()
     {
         RandomRoundsEnabled = !RandomRoundsEnabled;
-        if (RandomRoundsEnabled == false)
+        if (!RandomRoundsEnabled)
         {
             RemoveAllModifiers();
         }
-        
         GameModifiersUtils.PrintTitleToChatAll(RandomRoundsEnabled ? _localizer["Random rounds enabled for next round!"] : _localizer["Random rounds disabled!"], _localizer);
-        // 只在切换随机回合开关时显示简单的中心消息，不使用延长显示
         GameModifiersUtils.ShowMessageCentreAll(_localizer["Random Rounds {0}", (RandomRoundsEnabled ? _localizer["Enabled"] : _localizer["Disabled"])]);
     }
 
     public void ApplyRandomRoundsForRound()
     {
-        Random random = new Random();
-        int randomModifiersCount = random.Next(_minRandomRounds, _maxRandomRounds);
-
+        int randomModifiersCount = Random.Shared.Next(_minRandomRounds, _maxRandomRounds);
         if (AddRandomModifiers(randomModifiersCount, out List<GameModifierBase> addedModifiers))
         {
             LastActiveModifiers = ActiveModifiers.ToList();
@@ -811,46 +782,38 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
             return false;
         }
 
-        // Filter out modifiers not supporting random rounds and those currently active.
-        List<GameModifierBase> randomModifiersPool = RegisteredModifiers
-            .Where(modifier => modifier.SupportsRandomRounds && !ActiveModifiers.Contains(modifier) && (Config.CanRepeat || !LastActiveModifiers.Contains(modifier)))
+        // 筛选候选
+        List<GameModifierBase> candidates = RegisteredModifiers
+            .Where(m => m.SupportsRandomRounds && !ActiveModifiers.Contains(m) && (Config.CanRepeat || !LastActiveModifiers.Contains(m)))
             .ToList();
 
-        // Randomly remove modifiers that are incompatible within the randomModifiersPool.
-        List<GameModifierBase> possibleModifiersPool = randomModifiersPool.ToList();
-        Random random = new Random();
-
-        for (int a = 0; a < randomModifiersPool.Count; a++)
+        if (!candidates.Any())
         {
-            for (int b = a + 1; b < randomModifiersPool.Count; b++)
-            {
-                if (randomModifiersPool[a].CheckIfIncompatible(randomModifiersPool[b]) ||
-                    randomModifiersPool[b].CheckIfIncompatible(randomModifiersPool[a]))
-                {
-                    possibleModifiersPool.Remove(random.Next(0, 2) == 0 ? randomModifiersPool[a] : randomModifiersPool[b]);
-                }
-            }
-        }
-
-        if (!possibleModifiersPool.Any())
-        {
-            Console.WriteLine("[GameModifiers::AddRandomModifiers] Modifier pool is empty!");
+            Console.WriteLine("[GameModifiers::AddRandomModifiers] Candidate list empty!");
             return false;
         }
 
-        // Adjust modifierCount if not enough candidates.
-        if (modifierCount > possibleModifiersPool.Count)
+        // Fisher-Yates 洗牌
+        for (int i = candidates.Count - 1; i > 0; i--)
         {
-            Console.WriteLine($"[GameModifiers::AddRandomModifiers] Not enough modifiers in possible modifiers pool, reduced random modifier count from {modifierCount} to {possibleModifiersPool.Count}!");
-            modifierCount = possibleModifiersPool.Count;
+            int j = Random.Shared.Next(i + 1);
+            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
         }
 
-        // Generate a list of random modifiers from possibleModifiersPool.
-        for (int i = 0; i < modifierCount; i++)
+        foreach (var candidate in candidates)
         {
-            int randomIndex = random.Next(possibleModifiersPool.Count);
-            addedModifiers.Add(possibleModifiersPool[randomIndex]);
-            possibleModifiersPool.RemoveAt(randomIndex);
+            bool incompatible = false;
+            foreach (var picked in addedModifiers)
+            {
+                if (picked.CheckIfIncompatible(candidate) || candidate.CheckIfIncompatible(picked))
+                {
+                    incompatible = true;
+                    break;
+                }
+            }
+            if (incompatible) continue;
+            addedModifiers.Add(candidate);
+            if (addedModifiers.Count >= modifierCount) break;
         }
 
         if (!addedModifiers.Any())
@@ -875,47 +838,28 @@ public class GameModifiersCore : BasePlugin, IPluginConfig<GameModifiersConfig>
 
     private void ActivateModifiers(List<GameModifierBase> modifiers)
     {
-        if (!modifiers.Any())
-        {
-            return;
-        }
-
+        if (!modifiers.Any()) return;
         if (Config.ShowCentreMsg)
         {
-            // 构建包含游戏模式和描述的详细中心消息
             string centreActivationMsg = _localizer["Activating Modifiers:"] + "\n";
-
-            for (var index = 0; index < modifiers.Count; index++)
+            for (int i = 0; i < modifiers.Count; i++)
             {
-                if (index > 0)
-                {
-                    centreActivationMsg += "\n";
-                }
-
-                centreActivationMsg += $"{modifiers[index].Name} - {modifiers[index].Description}";
+                if (i > 0) centreActivationMsg += "\n";
+                centreActivationMsg += $"{modifiers[i].Name} - {modifiers[i].Description}";
             }
-
-            // 使用新的延长显示时间方法，只在激活时显示两次，传递this插件实例
             GameModifiersUtils.ShowMessageCentreAllWithExtendedDuration(centreActivationMsg, this);
         }
-
-        // 构建完整的消息，包含标题和所有修改器
         string completeMessage = _localizer["Activating modifiers:"];
-        for (var index = 0; index < modifiers.Count; index++)
+        for (int i = 0; i < modifiers.Count; i++)
         {
-            completeMessage += $"{modifiers[index].Name} - [{ChatColors.Lime}{modifiers[index].Description}{ChatColors.Default}]";
-            if (index < modifiers.Count - 1)
-            {
-                completeMessage += ", ";
-            }
+            completeMessage += $"{modifiers[i].Name} - [{ChatColors.Lime}{modifiers[i].Description}{ChatColors.Default}]";
+            if (i < modifiers.Count - 1) completeMessage += ", ";
         }
-        
         GameModifiersUtils.PrintTitleToChatAll(completeMessage, _localizer);
-
-        foreach (GameModifierBase? modifier in modifiers)
+        foreach (var m in modifiers)
         {
-            modifier.Enabled();
-            ActiveModifiers.Add(modifier);
+            m.Enabled();
+            ActiveModifiers.Add(m);
         }
     }
 }

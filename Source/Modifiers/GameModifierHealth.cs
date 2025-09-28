@@ -157,8 +157,20 @@ public class GameModifierRandomHealth : GameModifierHealth
 
     protected override void ApplyHealthToPlayer(CCSPlayerController? player)
     {
-        Random random = new Random();
-        MaxHealth = random.Next(HealthRange.Item1, HealthRange.Item2);
-        base.ApplyHealthToPlayer(player);
+        if (player == null || !player.IsValid || !player.PawnIsAlive)
+        {
+            return;
+        }
+        var pawn = player.PlayerPawn.Value;
+        if (pawn == null || !pawn.IsValid)
+        {
+            return;
+        }
+        if (!CachedOriginalMaxHealth.ContainsKey(player.Slot))
+        {
+            CachedOriginalMaxHealth.Add(player.Slot, pawn.MaxHealth);
+        }
+        int randomValue = Random.Shared.Next(HealthRange.Item1, HealthRange.Item2);
+        GameModifiersUtils.SetPlayerMaxHealth(pawn, randomValue);
     }
 }

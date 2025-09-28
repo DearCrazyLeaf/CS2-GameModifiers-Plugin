@@ -1,11 +1,15 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Utils;
+using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
+using GameModifiers.Modifiers; // ensure dispatcher symbol resolution
 
 namespace GameModifiers.Modifiers;
 
@@ -42,7 +46,7 @@ public abstract class GameModifierModelSwap : GameModifierBase
 
     protected virtual void ActivateSwap()
     {
-        Utilities.GetPlayers().ForEach(ApplyPlayerModel);;
+        Utilities.GetPlayers().ForEach(ApplyPlayerModel);
     }
 
     protected virtual void DeactivateSwap()
@@ -64,7 +68,7 @@ public abstract class GameModifierModelSwap : GameModifierBase
         }
 
         string playerModel = playerPawn.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName;
-        _playerModelCache.Add(player.Slot, playerModel);
+        _playerModelCache[player.Slot] = playerModel;
 
         if (teamModel == CsTeam.Terrorist)
         {
@@ -147,108 +151,211 @@ public class GameModifierImposters : GameModifierModelSwap
 
     public GameModifierImposters()
     {
-        Name = "Imposters";
-        Description = "A random player for each team has swapped sides";
+        Name = "Imposters"; // 保持名称兼容
+        Description = "FFA safe period (no damage) ends 10s after freeze";
     }
 
-    private readonly Dictionary<int, string> _cachedPlayerNames = new();
+    private string? _oldTeammatesEnemies;
+    private string? _oldFriendlyFire;
+
+    private Timer? _preRoundMessageTimer;
+    private Timer? _countdownTimer;
+    private float _freezeTime = 0f;
+    private int _countdownRemaining = 0;
+    private bool _roundStarted = false;
+    private bool _damageProtected = true; // 是否处于安全期
 
     protected override void ActivateSwap()
     {
-        ApplyImposter(GameModifiersUtils.GetTerroristPlayers());
-        ApplyImposter(GameModifiersUtils.GetCounterTerroristPlayers());
-
-        _cachedPlayerNames.Clear();
-        Utilities.GetPlayers().ForEach(player =>
+        CacheAndOverrideState();
+        StartPreRoundNotices();
+        if (Core != null)
         {
-            _cachedPlayerNames.Add(player.Slot, player.PlayerName);
-            player.PlayerName = " ";
-
-            Utilities.SetStateChanged(player, "CBasePlayerController", "m_iszPlayerName");
-        });
-
-        // 使用本地化版本的 PrintTitleToChatAll
-        if (Core != null && Core._localizer != null)
-        {
-            GameModifiersUtils.PrintTitleToChatAll("All names have been randomized for the imposter modifier!", Core._localizer);
+            Core.RegisterEventHandler<EventRoundStart>(OnRoundStart);
         }
-        else
-        {
-            // 如果没有本地化器，直接发送消息
-            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers All names have been randomized for the imposter modifier!"));
-        }
+        _dispatcherId = DamageHookDispatcher.Add(OnGlobalDamage); // central dispatcher
     }
 
     protected override void DeactivateSwap()
     {
-        Utilities.GetPlayers().ForEach(player =>
+        if (Core != null)
         {
-            if (_cachedPlayerNames.ContainsKey(player.Slot))
-            {
-                player.PlayerName = _cachedPlayerNames[player.Slot];
-                Utilities.SetStateChanged(player, "CBasePlayerController", "m_iszPlayerName");
-            }
-        });
-
-        // 使用本地化版本的 PrintTitleToChatAll
-        if (Core != null && Core._localizer != null)
-        {
-            GameModifiersUtils.PrintTitleToChatAll("All names have been put back to normal!", Core._localizer);
+            Core.DeregisterEventHandler<EventRoundStart>(OnRoundStart);
         }
-        else
+        CancelAllTimers();
+        RestoreState();
+        if (_dispatcherId != Guid.Empty)
         {
-            // 如果没有本地化器，直接发送消息
-            Utilities.GetPlayers().ForEach(player => player.PrintToChat("GameModifiers All names have been put back to normal!"));
+            DamageHookDispatcher.Remove(_dispatcherId);
+            _dispatcherId = Guid.Empty;
         }
-        _cachedPlayerNames.Clear();
     }
 
-    private void ApplyImposter(List<CCSPlayerController> players)
+    private Guid _dispatcherId = Guid.Empty;
+
+    // Dispatcher callback
+    private void OnGlobalDamage(CTakeDamageInfo dmg)
     {
-        if (!players.Any())
+        if (_damageProtected)
         {
-            return;
+            dmg.Damage = 0f;
+        }
+    }
+
+    private void CacheAndOverrideState()
+    {
+        var cFreeze = ConVar.Find("mp_freezetime");
+        if (cFreeze != null && float.TryParse(cFreeze.StringValue, out float fz)) _freezeTime = fz; else _freezeTime = 0f;
+
+        var cTeammatesEnemies = ConVar.Find("mp_teammates_are_enemies");
+        if (cTeammatesEnemies != null)
+        {
+            _oldTeammatesEnemies = cTeammatesEnemies.StringValue;
+            cTeammatesEnemies.SetValue("1");
+        }
+        var cFriendlyFire = ConVar.Find("mp_friendlyfire");
+        if (cFriendlyFire != null)
+        {
+            _oldFriendlyFire = cFriendlyFire.StringValue;
+            cFriendlyFire.SetValue("1");
         }
 
-        int randomPlayerIdx = Random.Shared.Next(players.Count);
-        CCSPlayerController player = players[randomPlayerIdx];
+        _damageProtected = true;
+        _roundStarted = false;
+    }
 
-        Vector? spawnPosition = null;
-        if (player.Team == CsTeam.Terrorist)
+    private void RestoreState()
+    {
+        var cTeammatesEnemies = ConVar.Find("mp_teammates_are_enemies");
+        if (cTeammatesEnemies != null && _oldTeammatesEnemies != null)
         {
-            spawnPosition = GameModifiersUtils.GetSpawnLocation(CsTeam.CounterTerrorist);
+            cTeammatesEnemies.SetValue(_oldTeammatesEnemies);
         }
-        else if (player.Team == CsTeam.CounterTerrorist)
+        var cFriendlyFire = ConVar.Find("mp_friendlyfire");
+        if (cFriendlyFire != null && _oldFriendlyFire != null)
         {
-            spawnPosition = GameModifiersUtils.GetSpawnLocation(CsTeam.Terrorist);
+            cFriendlyFire.SetValue(_oldFriendlyFire);
+        }
+        _oldFriendlyFire = null;
+        _oldTeammatesEnemies = null;
+    }
+
+    private void StartPreRoundNotices()
+    {
+        CancelPreRoundTimer();
+        if (Core == null) return;
+        SendPreRoundMessage();
+        _preRoundMessageTimer = Core.AddTimer(3.0f, () =>
+        {
+            if (!_roundStarted)
+            {
+                SendPreRoundMessage();
+            }
+        }, TimerFlags.REPEAT);
+    }
+
+    private void SendPreRoundMessage()
+    {
+        var loc = Core?._localizer;
+        string text = loc?["Imposters.SafePeriodPreRound"] ?? "当前为安全期，无法造成伤害";
+        GameModifiersUtils.PrintTitleToChatAll(text, loc!);
+    }
+
+    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    {
+        if (Core == null)
+        {
+            return HookResult.Continue;
+        }
+        _roundStarted = true;
+        CancelPreRoundTimer();
+
+        float delayBeforeCountdown = _freezeTime > 0 ? _freezeTime : 0f;
+        if (delayBeforeCountdown <= 0f)
+        {
+            BeginCountdownPhase();
         }
         else
         {
-            Console.WriteLine($"[GameModifierImposters::ApplyImposter] WARNING: Trying to apply imposter to un-supported player type for {player.PlayerName}!");
+            Core.AddTimer(delayBeforeCountdown, BeginCountdownPhase);
+        }
+        return HookResult.Continue;
+    }
+
+    private void BeginCountdownPhase()
+    {
+        if (Core == null) return;
+        StartCountdownMessages(10);
+        Core.AddTimer(10.0f, EndSafePeriod);
+    }
+
+    private void StartCountdownMessages(int seconds)
+    {
+        CancelCountdownTimer();
+        _countdownRemaining = seconds;
+        SendCountdownMessage();
+        if (Core == null) return;
+        _countdownTimer = Core.AddTimer(1.0f, () =>
+        {
+            if (_countdownRemaining > 0)
+            {
+                SendCountdownMessage();
+            }
+        }, TimerFlags.REPEAT);
+    }
+
+    private void SendCountdownMessage()
+    {
+        if (_countdownRemaining <= 0)
+        {
+            CancelCountdownTimer();
             return;
         }
-
-        // Apply player model swap
-        ApplyPlayerModel(player);
-
-        // Apply spawn pos
-        if (spawnPosition != null)
+        var loc = Core?._localizer;
+        string raw = loc?["Imposters.SafePeriodEndsIn", _countdownRemaining.ToString()] ?? $"{_countdownRemaining}秒后解除安全期！";
+        GameModifiersUtils.PrintTitleToChatAll(raw, loc!);
+        _countdownRemaining--;
+        if (_countdownRemaining <= 0)
         {
-            GameModifiersUtils.TeleportPlayer(player, spawnPosition);
+            CancelCountdownTimer();
         }
-        else
+    }
+
+    private void EndSafePeriod()
+    {
+        _damageProtected = false;
+        var loc = Core?._localizer;
+        string msg = loc?["Imposters.SafePeriodEnded"] ?? "安全期已结束，开始战斗！";
+        GameModifiersUtils.PrintTitleToChatAll(msg, loc!);
+    }
+
+    private void CancelPreRoundTimer()
+    {
+        if (_preRoundMessageTimer != null)
         {
-            Console.WriteLine($"[GameModifierImposters::ApplyImposter] WARNING: Could not move {player.PlayerName} to the opposing spawn!");
+            _preRoundMessageTimer.Kill();
+            _preRoundMessageTimer = null;
         }
+    }
+
+    private void CancelCountdownTimer()
+    {
+        if (_countdownTimer != null)
+        {
+            _countdownTimer.Kill();
+            _countdownTimer = null;
+        }
+    }
+
+    private void CancelAllTimers()
+    {
+        CancelPreRoundTimer();
+        CancelCountdownTimer();
     }
 
     protected override void ApplyPlayerModel(CCSPlayerController? player)
     {
-        if (player != null && player.IsValid)
-        {
-            CsTeam otherTeam = player.Team == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
-            SetPlayerModel(player, otherTeam);
-        }
+        // 不做模型或位置变换，保持默认。
     }
 }
 
