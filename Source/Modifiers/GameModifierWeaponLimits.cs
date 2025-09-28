@@ -30,7 +30,8 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
 
         if (Core != null && Core._localizer != null)
         {
-            GameModifiersUtils.PrintTitleToChatAll("Removing items, they will be returned when the modifier is disabled.", Core._localizer);
+            var loc = Core._localizer;
+            GameModifiersUtils.PrintTitleToChatAll(loc["RemovingItemsMessage"], loc);
         }
         else
         {
@@ -68,7 +69,8 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
             }
             if (Core != null && Core._localizer != null)
             {
-                GameModifiersUtils.PrintTitleToChatAll("Returning items for alive players now; dead players will get items on next spawn...", Core._localizer);
+                var loc = Core._localizer;
+                GameModifiersUtils.PrintTitleToChatAll(loc["ReturningItemsDeferredMessage"], loc);
             }
         }
         else
@@ -80,7 +82,8 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
             }
             if (Core != null && Core._localizer != null)
             {
-                GameModifiersUtils.PrintTitleToChatAll("Returning items...", Core._localizer);
+                var loc = Core._localizer;
+                GameModifiersUtils.PrintTitleToChatAll(loc["ReturningItemsMessage"], loc);
             }
             CachedItems.Clear();
         }
@@ -130,7 +133,6 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
                     case CSWeaponType.WEAPONTYPE_GRENADE:
                     {
                         cachedWeapons.Add(weapon.DesignerName);
-                        // Drop then schedule kill
                         playerPawn.WeaponServices!.ActiveWeapon.Raw = weapon.EntityHandle.Raw;
                         player.DropActiveWeapon();
                         toKillIndexes.Add(weapon.Index);
@@ -163,23 +165,22 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
         }
     }
 
-    // Returns true if restoration done; false if deferred
     private bool TryReturnWeaponsImmediate(CCSPlayerController? player)
     {
         if (player == null || !player.IsValid || !player.PawnIsAlive)
         {
-            return false; // defer
+            return false;
         }
 
         if (!CachedItems.TryGetValue(player.Slot, out var items))
         {
-            return true; // nothing to restore
+            return true;
         }
 
         var pawn = player.PlayerPawn.Value;
         if (pawn == null || !pawn.IsValid)
         {
-            return false; // defer
+            return false;
         }
 
         var existing = pawn.WeaponServices?.MyWeapons.Where(h => h.IsValid && h.Value != null)
@@ -249,6 +250,7 @@ public abstract class GameModifierRemoveWeapons : GameModifierBase
     }
 }
 
+/* KnifeOnly mode disabled per user request
 public class GameModifierKnifeOnly : GameModifierRemoveWeapons
 {
     public override bool SupportsRandomRounds => true;
@@ -265,16 +267,21 @@ public class GameModifierKnifeOnly : GameModifierRemoveWeapons
         Description = "Buy menu is disabled, knives only";
     }
 }
+*/
 
-public class GameModifierRandomWeapon : GameModifierRemoveWeapons
+// RandomWeapon implementation
+public class GameModifierRandomWeapon : GameModifierBase
 {
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
+        // KnifeOnly removed
         GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
         GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
     ];
+
+    protected readonly Dictionary<int, List<string>> _originalLoadouts = new();
+    protected readonly HashSet<int> _randomizedThisRound = new();
 
     public GameModifierRandomWeapon()
     {
@@ -285,58 +292,133 @@ public class GameModifierRandomWeapon : GameModifierRemoveWeapons
     public override void Enabled()
     {
         base.Enabled();
-        ApplyRandomWeapon();
+        _originalLoadouts.Clear();
+        _randomizedThisRound.Clear();
+        if (Core != null)
+        {
+            Core.RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+            Core.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+        }
+        // Process already alive players
+        Utilities.GetPlayers().ForEach(p => ScheduleRandomize(p));
     }
 
-    protected virtual void ApplyRandomWeapon()
+    public override void Disabled()
     {
+        if (Core != null)
+        {
+            Core.DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+            Core.RemoveListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+        }
+
+        foreach (var kv in _originalLoadouts.ToList())
+        {
+            var player = Utilities.GetPlayerFromSlot(kv.Key);
+            if (player == null || !player.IsValid || !player.PawnIsAlive) continue;
+            GameModifiersUtils.RemoveWeapons(player);
+            foreach (var weaponName in kv.Value)
+            {
+                player.GiveNamedItem(weaponName);
+            }
+        }
+        _originalLoadouts.Clear();
+        _randomizedThisRound.Clear();
+        base.Disabled();
+    }
+
+    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
+    {
+        ScheduleRandomize(@event.Userid);
+        return HookResult.Continue;
+    }
+
+    private void ScheduleRandomize(CCSPlayerController? player)
+    {
+        if (Core == null || player == null || !player.IsValid) return;
+        Core.AddTimer(0.5f, () => CaptureAndRandomize(player));
+    }
+
+    protected virtual void CaptureAndRandomize(CCSPlayerController? player)
+    {
+        if (player == null || !player.IsValid || !player.PawnIsAlive) return;
+        if (_randomizedThisRound.Contains(player.Slot)) return;
+        if (!_originalLoadouts.ContainsKey(player.Slot))
+        {
+            _originalLoadouts[player.Slot] = GetCurrentLoadout(player);
+        }
+        GameModifiersUtils.RemoveWeapons(player);
         string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
+        GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
+        _randomizedThisRound.Add(player.Slot);
         if (Core != null && Core._localizer != null)
         {
-            GameModifiersUtils.PrintTitleToChatAll($"{randomWeaponName.Substring(7)} round.", Core._localizer);
+            var loc = Core._localizer;
+            string display = randomWeaponName.Substring(7);
+            GameModifiersUtils.PrintTitleToChat(player, loc["RandomWeaponRound", display], loc);
         }
-        else
+    }
+
+    protected virtual List<string> GetCurrentLoadout(CCSPlayerController player)
+    {
+        List<string> list = new();
+        var pawn = player.PlayerPawn.Value;
+        if (pawn?.WeaponServices == null) return list;
+        foreach (var h in pawn.WeaponServices.MyWeapons)
         {
-            Utilities.GetPlayers().ForEach(player => player.PrintToChat($"GameModifiers {randomWeaponName.Substring(7)} round."));
+            if (!h.IsValid || h.Value == null) continue;
+            var w = h.Value;
+            switch (GameModifiersUtils.GetWeaponType(w))
+            {
+                case CSWeaponType.WEAPONTYPE_PISTOL:
+                case CSWeaponType.WEAPONTYPE_SUBMACHINEGUN:
+                case CSWeaponType.WEAPONTYPE_RIFLE:
+                case CSWeaponType.WEAPONTYPE_SHOTGUN:
+                case CSWeaponType.WEAPONTYPE_SNIPER_RIFLE:
+                case CSWeaponType.WEAPONTYPE_MACHINEGUN:
+                case CSWeaponType.WEAPONTYPE_TASER:
+                case CSWeaponType.WEAPONTYPE_GRENADE:
+                    list.Add(w.DesignerName);
+                    break;
+                default: break;
+            }
         }
-        Utilities.GetPlayers().ForEach(player =>
-        {
-            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
-        });
+        return list;
+    }
+
+    private void OnClientDisconnect(int slot)
+    {
+        _originalLoadouts.Remove(slot);
+        _randomizedThisRound.Remove(slot);
     }
 }
 
 public class GameModifierRandomWeapons : GameModifierRandomWeapon
 {
-    public override bool SupportsRandomRounds => true;
-    public override HashSet<string> IncompatibleModifiers =>
-    [
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>(),
-        GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>()
-    ];
-
     public GameModifierRandomWeapons()
     {
         Name = "RandomWeapons";
         Description = "Buy menu is disabled, random weapons are given out";
     }
 
-    protected override void ApplyRandomWeapon()
+    protected override void CaptureAndRandomize(CCSPlayerController? player)
     {
-        Utilities.GetPlayers().ForEach(player =>
+        if (player == null || !player.IsValid || !player.PawnIsAlive) return;
+        if (_randomizedThisRound.Contains(player.Slot)) return;
+        if (!_originalLoadouts.ContainsKey(player.Slot))
         {
-            string randomWeaponName = GameModifiersUtils.GetRandomRangedWeaponName();
-            if (Core != null && Core._localizer != null)
-            {
-                GameModifiersUtils.PrintTitleToChat(player, $"{randomWeaponName.Substring(7)} for random weapon round.", Core._localizer);
-            }
-            else
-            {
-                player.PrintToChat($"GameModifiers {randomWeaponName.Substring(7)} for random weapon round.");
-            }
-            GameModifiersUtils.GiveAndEquipWeapon(player, randomWeaponName);
-        });
+            _originalLoadouts[player.Slot] = GetCurrentLoadout(player);
+        }
+        GameModifiersUtils.RemoveWeapons(player);
+        string primary = GameModifiersUtils.GetRandomRangedWeaponName();
+        string secondary = GameModifiersUtils.GetRandomRangedWeaponName();
+        GameModifiersUtils.GiveAndEquipWeapon(player, primary);
+        GameModifiersUtils.GiveAndEquipWeapon(player, secondary);
+        _randomizedThisRound.Add(player.Slot);
+        if (Core != null && Core._localizer != null)
+        {
+            var loc = Core._localizer;
+            GameModifiersUtils.PrintTitleToChat(player, loc["RandomWeaponsRound", primary.Substring(7), secondary.Substring(7)], loc);
+        }
     }
 }
 
@@ -346,7 +428,7 @@ public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
     public override HashSet<string> IncompatibleModifiers =>
     [
         GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>(),
-        GameModifiersUtils.GetModifierName<GameModifierKnifeOnly>(),
+        /* KnifeOnly removed */
         GameModifiersUtils.GetModifierName<GameModifierRandomWeapons>()
     ];
 

@@ -87,7 +87,7 @@ public abstract class GameModifierVelocity : GameModifierBase
 public class GameModifierLightweight : GameModifierVelocity
 {
     public override bool SupportsRandomRounds => true;
-    public override float SpeedMultiplier { get; protected set; } = 2.0f;
+    public override float SpeedMultiplier { get; protected set; } = 1.3f;
     public override HashSet<string> IncompatibleModifiers =>
     [
         "LeadBoots"
