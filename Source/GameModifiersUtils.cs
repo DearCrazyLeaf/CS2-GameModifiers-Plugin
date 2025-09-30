@@ -58,7 +58,24 @@ internal static class GameModifiersUtils
         "weapon_g3sg1",
         "weapon_negev"
     ];
-    
+
+    // Added categorized lists for primary/pistol selection
+    private static readonly string[] PistolWeaponNames = new[]
+    {
+        "weapon_glock","weapon_hkp2000","weapon_usp_silencer","weapon_p250","weapon_cz75a","weapon_fiveseven","weapon_deagle","weapon_revolver","weapon_tec9"
+    };
+    private static readonly HashSet<string> PistolSet = PistolWeaponNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly string[] PrimaryWeaponNames = RangedWeaponNames
+        .Where(w => !PistolSet.Contains(w) && w != "weapon_taser")
+        .ToArray();
+
+    public static string GetRandomPrimaryWeaponName()
+        => PrimaryWeaponNames.Length == 0 ? GetRandomRangedWeaponName() : PrimaryWeaponNames[Random.Shared.Next(PrimaryWeaponNames.Length)];
+
+    public static string GetRandomPistolWeaponName()
+        => PistolWeaponNames.Length == 0 ? GetRandomRangedWeaponName() : PistolWeaponNames[Random.Shared.Next(PistolWeaponNames.Length)];
+
     public static List<CCSPlayerController> GetPlayerFromName(string name)
     {
         var players = Utilities.GetPlayers();
