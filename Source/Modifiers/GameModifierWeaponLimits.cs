@@ -218,13 +218,22 @@ public class GameModifierRandomWeapon : GameModifierBase
     ];
 
     private enum RandomCategory { Primary, Pistol }
+
+    private sealed class GrantedInfo
+    {
+        public string Name = string.Empty;
+        public int EntityIndex = -1; // tracked for stability even if designer name duplicates
+        public DateTime LastGrantUtc = DateTime.MinValue;
+    }
+
     protected readonly Dictionary<int, List<string>> _originalLoadouts = new();
-    protected readonly Dictionary<int, string> _granted = new();
+    private readonly Dictionary<int, GrantedInfo> _granted = new();
     private RandomCategory _chosenCategory;
     private Timer? _enforceTimer;
     private float _interval = 0.25f;
     private int _stableCycles = 0;
-    private const int StableThreshold = 8; // after this with zero changes slow down
+    private const int StableThreshold = 8;
+    private static readonly TimeSpan RegrantCooldown = TimeSpan.FromSeconds(0.5);
 
     public GameModifierRandomWeapon()
     {
@@ -238,8 +247,8 @@ public class GameModifierRandomWeapon : GameModifierBase
         _originalLoadouts.Clear();
         _granted.Clear();
         _chosenCategory = Random.Shared.Next(2) == 0 ? RandomCategory.Primary : RandomCategory.Pistol;
-        ApplyInitial();
-        StartEnforcementLoop();
+        CaptureInitial();
+        StartLoop();
     }
 
     public override void Disabled()
@@ -252,17 +261,17 @@ public class GameModifierRandomWeapon : GameModifierBase
         base.Disabled();
     }
 
-    private void ApplyInitial()
+    private void CaptureInitial()
     {
         foreach (var p in Utilities.GetPlayers())
         {
             if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
-            CaptureIfNeeded(p);
-            GiveIfMissing(p);
+            CaptureOriginal(p);
+            EnsureGrantAfterClean(p, force:true);
         }
     }
 
-    private void StartEnforcementLoop()
+    private void StartLoop()
     {
         _enforceTimer?.Kill();
         _interval = 0.25f;
@@ -276,15 +285,15 @@ public class GameModifierRandomWeapon : GameModifierBase
         foreach (var p in Utilities.GetPlayers())
         {
             if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
-            if (!_originalLoadouts.ContainsKey(p.Slot)) CaptureIfNeeded(p);
-            if (EnforcePlayer(p)) anyChange = true;
+            if (!_originalLoadouts.ContainsKey(p.Slot)) CaptureOriginal(p);
+            if (CleanIllegal(p)) anyChange = true;
+            if (EnsureGrantAfterClean(p)) anyChange = true; // grant only after cleaning
         }
         if (anyChange)
         {
             _stableCycles = 0;
             if (_interval > 0.25f)
             {
-                // Speed up again
                 _enforceTimer?.Kill();
                 _interval = 0.25f;
                 _enforceTimer = new Timer(_interval, EnforcementTick, TimerFlags.REPEAT);
@@ -295,7 +304,6 @@ public class GameModifierRandomWeapon : GameModifierBase
             _stableCycles++;
             if (_stableCycles >= StableThreshold && _interval < 1.0f)
             {
-                // Slow down
                 _enforceTimer?.Kill();
                 _interval = 1.0f;
                 _enforceTimer = new Timer(_interval, EnforcementTick, TimerFlags.REPEAT);
@@ -303,7 +311,7 @@ public class GameModifierRandomWeapon : GameModifierBase
         }
     }
 
-    private void CaptureIfNeeded(CCSPlayerController player)
+    private void CaptureOriginal(CCSPlayerController player)
     {
         if (_originalLoadouts.ContainsKey(player.Slot)) return;
         var list = new List<string>();
@@ -314,30 +322,29 @@ public class GameModifierRandomWeapon : GameModifierBase
             if (!h.IsValid || h.Value == null) continue;
             var w = h.Value;
             var t = GameModifiersUtils.GetWeaponType(w);
-            if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue; // don't cache
-            // cache all removable ranged / utility weapons
+            if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue;
             list.Add(w.DesignerName);
         }
         _originalLoadouts[player.Slot] = list;
     }
 
-    private bool EnforcePlayer(CCSPlayerController player)
+    // Remove all non-knife, non-granted weapons. Return true if changes occurred.
+    private bool CleanIllegal(CCSPlayerController player)
     {
-        bool changed = false;
         var pawn = player.PlayerPawn.Value;
         if (pawn?.WeaponServices == null) return false;
-        string granted = GiveIfMissing(player);
-        var handles = pawn.WeaponServices.MyWeapons.ToList();
+        _granted.TryGetValue(player.Slot, out var gi);
+        bool changed = false;
         List<uint> toKill = new();
-        foreach (var h in handles)
+        foreach (var h in pawn.WeaponServices.MyWeapons.ToList())
         {
             if (!h.IsValid || h.Value == null) continue;
             var w = h.Value;
-            var name = w.DesignerName;
-            if (string.IsNullOrEmpty(name)) continue;
-            if (name.Contains("knife", StringComparison.OrdinalIgnoreCase)) continue; // keep knife
-            if (name.Equals(granted, StringComparison.OrdinalIgnoreCase)) continue; // keep granted
-            // remove everything else
+            string name = w.DesignerName ?? string.Empty;
+            if (name.Contains("knife", StringComparison.OrdinalIgnoreCase)) continue;
+            // keep granted if entity index matches OR name matches
+            if (gi != null && (w.Index == gi.EntityIndex || name.Equals(gi.Name, StringComparison.OrdinalIgnoreCase))) continue;
+            // otherwise remove
             pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
             player.DropActiveWeapon();
             toKill.Add(w.Index);
@@ -357,31 +364,58 @@ public class GameModifierRandomWeapon : GameModifierBase
         return changed;
     }
 
-    private string GiveIfMissing(CCSPlayerController player)
+    // Ensure player has granted weapon after cleaning. Returns true if we granted (change state).
+    private bool EnsureGrantAfterClean(CCSPlayerController player, bool force = false)
     {
-        if (!_granted.TryGetValue(player.Slot, out var weapon) || string.IsNullOrEmpty(weapon))
+        var now = DateTime.UtcNow;
+        var pawn = player.PlayerPawn.Value;
+        if (pawn?.WeaponServices == null) return false;
+
+        _granted.TryGetValue(player.Slot, out var gi);
+        bool hasGranted = false;
+        if (gi != null)
         {
-            weapon = _chosenCategory == RandomCategory.Primary ? GameModifiersUtils.GetRandomPrimaryWeaponName() : GameModifiersUtils.GetRandomPistolWeaponName();
-            _granted[player.Slot] = weapon;
-            GameModifiersUtils.GiveAndEquipWeapon(player, weapon);
-            if (Core != null && Core._localizer != null)
+            foreach (var h in pawn.WeaponServices.MyWeapons)
             {
-                var loc = Core._localizer;
-                string key = _chosenCategory == RandomCategory.Primary ? "RandomPrimaryWeaponRound" : "RandomPistolWeaponRound";
-                GameModifiersUtils.PrintTitleToChat(player, loc[key, weapon.Substring(7)], loc);
+                if (!h.IsValid || h.Value == null) continue;
+                var w = h.Value;
+                if (w.Index == gi.EntityIndex || (gi.EntityIndex == -1 && w.DesignerName != null && w.DesignerName.Equals(gi.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    hasGranted = true;
+                    break;
+                }
             }
+        }
+        if (!hasGranted && gi != null)
+        {
+            // check cooldown
+            if (!force && now - gi.LastGrantUtc < RegrantCooldown) return false;
+        }
+        if (hasGranted && !force) return false; // nothing to do
+
+        // Need to grant
+        string weaponName;
+        if (gi == null)
+        {
+            weaponName = _chosenCategory == RandomCategory.Primary ? GameModifiersUtils.GetRandomPrimaryWeaponName() : GameModifiersUtils.GetRandomPistolWeaponName();
+            gi = new GrantedInfo { Name = weaponName };
+            _granted[player.Slot] = gi;
         }
         else
         {
-            // ensure player still has it
-            var pawn = player.PlayerPawn.Value;
-            bool has = pawn?.WeaponServices?.MyWeapons.Any(h => h.IsValid && h.Value != null && h.Value.DesignerName == weapon) == true;
-            if (!has)
-            {
-                GameModifiersUtils.GiveAndEquipWeapon(player, weapon);
-            }
+            weaponName = gi.Name;
         }
-        return weapon;
+
+        var given = GameModifiersUtils.GiveAndEquipWeapon(player, weaponName);
+        gi.LastGrantUtc = now;
+        gi.EntityIndex = given != null && given.IsValid ? (int)given.Index : -1;
+        if (Core != null && Core._localizer != null && force) // announce only first time to reduce spam
+        {
+            var loc = Core._localizer;
+            string key = _chosenCategory == RandomCategory.Primary ? "RandomPrimaryWeaponRound" : "RandomPistolWeaponRound";
+            GameModifiersUtils.PrintTitleToChat(player, loc[key, weaponName.Substring(7)], loc);
+        }
+        return true;
     }
 
     private void RestoreOriginalForAlivePlayers()
@@ -390,35 +424,24 @@ public class GameModifierRandomWeapon : GameModifierBase
         {
             var player = Utilities.GetPlayerFromSlot(kv.Key);
             if (player == null || !player.IsValid || !player.PawnIsAlive) continue;
-            // strip granted weapon
             var pawn = player.PlayerPawn.Value;
-            if (pawn?.WeaponServices != null)
+            if (pawn?.WeaponServices != null && _granted.TryGetValue(player.Slot, out var gi))
             {
-                var handles = pawn.WeaponServices.MyWeapons.ToList();
-                List<uint> toKill = new();
-                foreach (var h in handles)
+                foreach (var h in pawn.WeaponServices.MyWeapons.ToList())
                 {
                     if (!h.IsValid || h.Value == null) continue;
                     var w = h.Value;
-                    if (w.DesignerName == null) continue;
-                    if (w.DesignerName.Contains("knife", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (_granted.TryGetValue(player.Slot, out var gw) && string.Equals(gw, w.DesignerName, StringComparison.OrdinalIgnoreCase))
+                    if (w.Index == gi.EntityIndex || (w.DesignerName != null && w.DesignerName.Equals(gi.Name, StringComparison.OrdinalIgnoreCase)))
                     {
                         pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
                         player.DropActiveWeapon();
-                        toKill.Add(w.Index);
-                    }
-                }
-                if (toKill.Count > 0)
-                {
-                    Server.NextFrame(() =>
-                    {
-                        foreach (var idx in toKill)
+                        var idx = w.Index;
+                        Server.NextFrame(() =>
                         {
                             var ent = Utilities.GetEntityFromIndex<CBasePlayerWeapon>((int)idx);
                             if (ent != null && ent.IsValid) ent.AcceptInput("Kill");
-                        }
-                    });
+                        });
+                    }
                 }
             }
             foreach (var orig in kv.Value)
@@ -443,15 +466,17 @@ public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
         GameModifiersUtils.GetModifierName<GameModifierRandomWeapon>()
     ];
 
-    private Timer? _enforceTimer;
+    private Timer? _loop;
     private float _interval = 0.25f;
-    private int _stableCycles = 0;
+    private int _stable = 0;
     private const int StableThreshold = 8;
+    private readonly Dictionary<int, DateTime> _lastGrant = new();
+    private static readonly TimeSpan GrenadeRegrantCooldown = TimeSpan.FromSeconds(0.5);
+    private static readonly string[] RequiredGrenades = ["weapon_molotov","weapon_smokegrenade","weapon_hegrenade","weapon_flashbang"];
 
     protected override bool ShouldCacheAndRemoveWeapon(CBasePlayerWeapon weapon)
     {
         var t = GameModifiersUtils.GetWeaponType(weapon);
-        // remove everything that is not grenade or C4
         return t switch
         {
             CSWeaponType.WEAPONTYPE_GRENADE => false,
@@ -469,81 +494,83 @@ public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
     public override void Enabled()
     {
         base.Enabled();
-        GiveGrenadesAll();
+        GiveInitial();
         StartLoop();
     }
 
     public override void Disabled()
     {
-        _enforceTimer?.Kill();
-        _enforceTimer = null;
+        _loop?.Kill();
+        _loop = null;
+        _lastGrant.Clear();
         base.Disabled();
     }
 
-    private void GiveGrenadesAll()
+    private void GiveInitial()
     {
-        Utilities.GetPlayers().ForEach(player =>
+        foreach (var p in Utilities.GetPlayers())
         {
-            if (player == null || !player.IsValid || !player.PawnIsAlive) return;
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_molotov");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_smokegrenade");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_hegrenade");
-            GameModifiersUtils.GiveAndEquipWeapon(player, "weapon_flashbang");
-        });
+            if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
+            foreach (var g in RequiredGrenades)
+            {
+                GameModifiersUtils.GiveAndEquipWeapon(p, g);
+            }
+            _lastGrant[p.Slot] = DateTime.UtcNow;
+        }
     }
 
     private void StartLoop()
     {
-        _enforceTimer?.Kill();
+        _loop?.Kill();
         _interval = 0.25f;
-        _stableCycles = 0;
-        _enforceTimer = new Timer(_interval, Enforce, TimerFlags.REPEAT);
+        _stable = 0;
+        _loop = new Timer(_interval, LoopTick, TimerFlags.REPEAT);
     }
 
-    private void Enforce()
+    private void LoopTick()
     {
         bool anyChange = false;
+        var now = DateTime.UtcNow;
         foreach (var p in Utilities.GetPlayers())
         {
             if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
-            if (EnforcePlayer(p)) anyChange = true;
+            if (CleanIllegalGrenadePlayer(p)) anyChange = true;
+            if (EnsureGrenades(p, now)) anyChange = true;
         }
         if (anyChange)
         {
-            _stableCycles = 0;
+            _stable = 0;
             if (_interval > 0.25f)
             {
-                _enforceTimer?.Kill();
+                _loop?.Kill();
                 _interval = 0.25f;
-                _enforceTimer = new Timer(_interval, Enforce, TimerFlags.REPEAT);
+                _loop = new Timer(_interval, LoopTick, TimerFlags.REPEAT);
             }
         }
         else
         {
-            _stableCycles++;
-            if (_stableCycles >= StableThreshold && _interval < 1.0f)
+            _stable++;
+            if (_stable >= StableThreshold && _interval < 1.0f)
             {
-                _enforceTimer?.Kill();
+                _loop?.Kill();
                 _interval = 1.0f;
-                _enforceTimer = new Timer(_interval, Enforce, TimerFlags.REPEAT);
+                _loop = new Timer(_interval, LoopTick, TimerFlags.REPEAT);
             }
         }
     }
 
-    private bool EnforcePlayer(CCSPlayerController player)
+    private bool CleanIllegalGrenadePlayer(CCSPlayerController player)
     {
-        bool changed = false;
         var pawn = player.PlayerPawn.Value;
         if (pawn?.WeaponServices == null) return false;
-        var handles = pawn.WeaponServices.MyWeapons.ToList();
+        bool changed = false;
         List<uint> toKill = new();
-        foreach (var h in handles)
+        foreach (var h in pawn.WeaponServices.MyWeapons.ToList())
         {
             if (!h.IsValid || h.Value == null) continue;
             var w = h.Value;
             var t = GameModifiersUtils.GetWeaponType(w);
             if (t == CSWeaponType.WEAPONTYPE_GRENADE || t == CSWeaponType.WEAPONTYPE_C4) continue;
-            // remove
             pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
             player.DropActiveWeapon();
             toKill.Add(w.Index);
@@ -560,14 +587,28 @@ public class GameModifierGrenadesOnly : GameModifierRemoveWeapons
                 }
             });
         }
-        // ensure grenades set present (re-grant if missing any)
-        string[] required = ["weapon_molotov","weapon_smokegrenade","weapon_hegrenade","weapon_flashbang"];
-        var existing = handles.Where(h => h.IsValid && h.Value != null).Select(h => h.Value!.DesignerName).ToHashSet();
-        foreach (var g in required)
+        return changed;
+    }
+
+    private bool EnsureGrenades(CCSPlayerController player, DateTime now)
+    {
+        var pawn = player.PlayerPawn.Value;
+        if (pawn?.WeaponServices == null) return false;
+        var existing = pawn.WeaponServices.MyWeapons.Where(h => h.IsValid && h.Value != null)
+            .Select(h => h.Value!.DesignerName).ToHashSet();
+        bool changed = false;
+        foreach (var g in RequiredGrenades)
         {
-            if (!existing.Contains(g)) { GameModifiersUtils.GiveAndEquipWeapon(player, g); changed = true; }
+            if (!existing.Contains(g))
+            {
+                if (!_lastGrant.TryGetValue(player.Slot, out var last) || now - last >= GrenadeRegrantCooldown)
+                {
+                    GameModifiersUtils.GiveAndEquipWeapon(player, g);
+                    _lastGrant[player.Slot] = now;
+                    changed = true;
+                }
+            }
         }
         return changed;
     }
 }
-// End of file
