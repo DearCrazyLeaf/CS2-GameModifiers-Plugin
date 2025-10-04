@@ -217,198 +217,144 @@ public class GameModifierRandomWeapon : GameModifierBase
         GameModifiersUtils.GetModifierName<GameModifierGrenadesOnly>()
     ];
 
-    private enum RandomCategory { Primary, Pistol }
-
     private readonly Dictionary<int, List<string>> _originalLoadouts = new();
-    private readonly Dictionary<int, DateTime> _lastGrant = new();
-    private RandomCategory _chosenCategory;
-    private Timer? _enforceTimer;
-    private float _interval = 0.25f;
-    private int _stableCycles = 0;
-    private const int StableThreshold = 8;
-    private static readonly TimeSpan GrantCooldown = TimeSpan.FromSeconds(0.5);
+    private readonly HashSet<int> _applied = new(); // players already processed (for late spawns)
 
     public GameModifierRandomWeapon()
     {
         Name = "RandomWeapon";
-        Description = "Buy menu is disabled, random primary OR pistol (one category only)";
+        Description = "Buy menu disabled. Each player gets ONE random primary OR pistol (issued once).";
     }
 
     public override void Enabled()
     {
         base.Enabled();
         _originalLoadouts.Clear();
-        _lastGrant.Clear();
-        _chosenCategory = Random.Shared.Next(2) == 0 ? RandomCategory.Primary : RandomCategory.Pistol;
-        CaptureOriginalAll();
-        StartLoop();
+        _applied.Clear();
+        if (Core != null)
+        {
+            Core.RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn); // for late spawns
+            Core.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+        }
+        foreach (var p in Utilities.GetPlayers())
+        {
+            if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
+            ApplyOnce(p);
+        }
     }
 
     public override void Disabled()
     {
-        _enforceTimer?.Kill();
-        _enforceTimer = null;
-        RestoreOriginal();
-        _originalLoadouts.Clear();
-        _lastGrant.Clear();
-        base.Disabled();
-    }
-
-    private void CaptureOriginalAll()
-    {
-        foreach (var p in Utilities.GetPlayers()) CaptureOriginal(p);
-    }
-
-    private void CaptureOriginal(CCSPlayerController? player)
-    {
-        if (player == null || !player.IsValid || !player.PawnIsAlive) return;
-        if (_originalLoadouts.ContainsKey(player.Slot)) return;
-        var list = new List<string>();
-        var pawn = player.PlayerPawn.Value;
-        if (pawn?.WeaponServices == null) return;
-        foreach (var h in pawn.WeaponServices.MyWeapons)
+        if (Core != null)
         {
-            if (!h.IsValid || h.Value == null) continue;
-            var w = h.Value;
-            var t = GameModifiersUtils.GetWeaponType(w);
-            if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue;
-            list.Add(w.DesignerName);
+            Core.DeregisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+            Core.RemoveListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
         }
-        _originalLoadouts[player.Slot] = list;
-    }
-
-    private void StartLoop()
-    {
-        _stableCycles = 0;
-        _interval = 0.25f;
-        _enforceTimer?.Kill();
-        _enforceTimer = new Timer(_interval, Tick, TimerFlags.REPEAT);
-    }
-
-    private void Tick()
-    {
-        bool changed = false;
-        foreach (var p in Utilities.GetPlayers())
-        {
-            if (p == null || !p.IsValid || !p.PawnIsAlive) continue;
-            if (!_originalLoadouts.ContainsKey(p.Slot)) CaptureOriginal(p);
-            if (EnforcePlayer(p)) changed = true;
-        }
-        if (changed)
-        {
-            _stableCycles = 0;
-            if (_interval > 0.25f)
-            {
-                _enforceTimer?.Kill();
-                _interval = 0.25f;
-                _enforceTimer = new Timer(_interval, Tick, TimerFlags.REPEAT);
-            }
-        }
-        else
-        {
-            _stableCycles++;
-            if (_stableCycles >= StableThreshold && _interval < 1.0f)
-            {
-                _enforceTimer?.Kill();
-                _interval = 1.0f;
-                _enforceTimer = new Timer(_interval, Tick, TimerFlags.REPEAT);
-            }
-        }
-    }
-
-    private bool EnforcePlayer(CCSPlayerController player)
-    {
-        var pawn = player.PlayerPawn.Value;
-        if (pawn?.WeaponServices == null) return false;
-        bool changed = false;
-        // Categorize current weapons
-        List<(CBasePlayerWeapon w, CSWeaponType t)> weapons = new();
-        foreach (var h in pawn.WeaponServices.MyWeapons)
-        {
-            if (!h.IsValid || h.Value == null) continue;
-            var w = h.Value;
-            weapons.Add((w, GameModifiersUtils.GetWeaponType(w)));
-        }
-
-        bool hasCategoryWeapon = false;
-        foreach (var (w, t) in weapons)
-        {
-            if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue;
-            bool isCategory = _chosenCategory == RandomCategory.Primary
-                ? (t is CSWeaponType.WEAPONTYPE_RIFLE or CSWeaponType.WEAPONTYPE_SUBMACHINEGUN or CSWeaponType.WEAPONTYPE_SHOTGUN or CSWeaponType.WEAPONTYPE_SNIPER_RIFLE or CSWeaponType.WEAPONTYPE_MACHINEGUN)
-                : (t is CSWeaponType.WEAPONTYPE_PISTOL or CSWeaponType.WEAPONTYPE_TASER);
-            if (isCategory)
-            {
-                if (!hasCategoryWeapon)
-                {
-                    hasCategoryWeapon = true; // keep first
-                    continue;
-                }
-            }
-            // remove any not first category or any other ranged / grenade
-            pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
-            player.DropActiveWeapon();
-            var idx = w.Index;
-            Server.NextFrame(() =>
-            {
-                var ent = Utilities.GetEntityFromIndex<CBasePlayerWeapon>((int)idx);
-                if (ent != null && ent.IsValid) ent.AcceptInput("Kill");
-            });
-            changed = true;
-        }
-
-        if (!hasCategoryWeapon)
-        {
-            var now = DateTime.UtcNow;
-            if (!_lastGrant.TryGetValue(player.Slot, out var last) || now - last >= GrantCooldown)
-            {
-                string weaponName = _chosenCategory == RandomCategory.Primary ? GameModifiersUtils.GetRandomPrimaryWeaponName() : GameModifiersUtils.GetRandomPistolWeaponName();
-                GameModifiersUtils.GiveAndEquipWeapon(player, weaponName);
-                _lastGrant[player.Slot] = now;
-                if (Core != null && Core._localizer != null)
-                {
-                    var loc = Core._localizer;
-                    string key = _chosenCategory == RandomCategory.Primary ? "RandomPrimaryWeaponRound" : "RandomPistolWeaponRound";
-                    GameModifiersUtils.PrintTitleToChat(player, loc[key, weaponName.Substring(7)], loc);
-                }
-                changed = true;
-            }
-        }
-        return changed;
-    }
-
-    private void RestoreOriginal()
-    {
+        // Only restore alive players; dead players ignored per requirement
         foreach (var kv in _originalLoadouts.ToList())
         {
             var player = Utilities.GetPlayerFromSlot(kv.Key);
-            if (player == null || !player.IsValid || !player.PawnIsAlive) continue;
-            var pawn = player.PlayerPawn.Value;
-            if (pawn?.WeaponServices == null) continue;
-            // strip all non-knife before restore
-            foreach (var h in pawn.WeaponServices.MyWeapons.ToList())
+            if (player == null || !player.IsValid || !player.PawnIsAlive) continue; // skip dead
+            RestorePlayer(player, kv.Value);
+        }
+        _originalLoadouts.Clear();
+        _applied.Clear();
+        base.Disabled();
+    }
+
+    private void ApplyOnce(CCSPlayerController player)
+    {
+        if (_applied.Contains(player.Slot)) return;
+        CaptureOriginal(player);
+        StripAll(player);
+        // Decide category randomly PER PLAYER (simpler & more variety)
+        bool givePrimary = Random.Shared.Next(2) == 0;
+        string weaponName = givePrimary ? GameModifiersUtils.GetRandomPrimaryWeaponName() : GameModifiersUtils.GetRandomPistolWeaponName();
+        GameModifiersUtils.GiveAndEquipWeapon(player, weaponName);
+        if (Core != null && Core._localizer != null)
+        {
+            var loc = Core._localizer;
+            string key = givePrimary ? "RandomPrimaryWeaponRound" : "RandomPistolWeaponRound";
+            GameModifiersUtils.PrintTitleToChat(player, loc[key, weaponName.Substring(7)], loc);
+        }
+        _applied.Add(player.Slot);
+    }
+
+    private void CaptureOriginal(CCSPlayerController player)
+    {
+        if (_originalLoadouts.ContainsKey(player.Slot)) return;
+        var list = new List<string>();
+        var pawn = player.PlayerPawn.Value;
+        if (pawn?.WeaponServices != null)
+        {
+            foreach (var h in pawn.WeaponServices.MyWeapons)
             {
                 if (!h.IsValid || h.Value == null) continue;
                 var w = h.Value;
                 var t = GameModifiersUtils.GetWeaponType(w);
-                if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue;
-                pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
-                player.DropActiveWeapon();
-                var idx = w.Index;
-                Server.NextFrame(() =>
+                if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue; // don't record knife/c4
+                var name = w.DesignerName; if (string.IsNullOrEmpty(name)) continue;
+                if (!list.Contains(name)) list.Add(name);
+            }
+        }
+        _originalLoadouts[player.Slot] = list;
+    }
+
+    private void StripAll(CCSPlayerController player)
+    {
+        var pawn = player.PlayerPawn.Value;
+        if (pawn?.WeaponServices == null) return;
+        List<uint> toKill = new();
+        foreach (var h in pawn.WeaponServices.MyWeapons.ToList())
+        {
+            if (!h.IsValid || h.Value == null) continue;
+            var w = h.Value;
+            var t = GameModifiersUtils.GetWeaponType(w);
+            if (t == CSWeaponType.WEAPONTYPE_KNIFE || t == CSWeaponType.WEAPONTYPE_C4) continue; // keep knife & bomb
+            pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
+            player.DropActiveWeapon();
+            toKill.Add(w.Index);
+        }
+        if (toKill.Count > 0)
+        {
+            Server.NextFrame(() =>
+            {
+                foreach (var idx in toKill)
                 {
                     var ent = Utilities.GetEntityFromIndex<CBasePlayerWeapon>((int)idx);
                     if (ent != null && ent.IsValid) ent.AcceptInput("Kill");
-                });
-            }
-            foreach (var orig in kv.Value) player.GiveNamedItem(orig);
+                }
+            });
         }
+    }
+
+    private void RestorePlayer(CCSPlayerController player, List<string> original)
+    {
+        // Remove granted random weapon(s) (all non-knife) first
+        StripAll(player);
+        foreach (var name in original)
+        {
+            player.GiveNamedItem(name);
+        }
+    }
+
+    private HookResult OnPlayerSpawn(EventPlayerSpawn ev, GameEventInfo info)
+    {
+        var p = ev.Userid;
+        if (p == null || !p.IsValid || !p.PawnIsAlive) return HookResult.Continue;
+        if (!IsActive) return HookResult.Continue;
+        // Only apply if this player hasn't been processed yet in this activation
+        Server.NextFrame(() =>
+        {
+            if (p != null && p.IsValid && p.PawnIsAlive) ApplyOnce(p);
+        });
+        return HookResult.Continue;
     }
 
     private void OnClientDisconnect(int slot)
     {
         _originalLoadouts.Remove(slot);
-        _lastGrant.Remove(slot);
+        _applied.Remove(slot);
     }
 }
 
@@ -560,21 +506,18 @@ public class GameModifierGrenadesOnly : GameModifierBase
             {
                 pawn.WeaponServices.ActiveWeapon.Raw = w.EntityHandle.Raw;
                 p.DropActiveWeapon();
-                toKill.Add(w.Index);
-                changed = true;
-            }
-        }
-        if (toKill.Count > 0)
-        {
-            Server.NextFrame(() =>
-            {
-                foreach (var idx in toKill)
+                var idx = w.Index;
+                Server.NextFrame(() =>
                 {
                     var ent = Utilities.GetEntityFromIndex<CBasePlayerWeapon>((int)idx);
                     if (ent != null && ent.IsValid) ent.AcceptInput("Kill");
-                }
-            });
+                });
+                changed = true;
+            }
         }
+
+        if (!changed) return false; // nothing to change
+
         // Pass 2: Grant curated set if missing (respect cooldown)
         var existing = pawn.WeaponServices.MyWeapons.Where(h => h.IsValid && h.Value != null)
             .Select(h => h.Value!.DesignerName).ToHashSet(StringComparer.OrdinalIgnoreCase);
