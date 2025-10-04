@@ -102,6 +102,8 @@ public abstract class GameModifierWeapon : GameModifierBase
     }
 }
 
+/*
+// OnePerReload mode disabled per user request
 public class GameModifierOnePerMag : GameModifierWeapon
 {
     public override bool SupportsRandomRounds => true;
@@ -122,36 +124,20 @@ public class GameModifierOnePerMag : GameModifierWeapon
 
     protected override bool ApplyWeaponModifier(CBasePlayerWeapon? weapon)
     {
-        if (weapon == null || !weapon.IsValid || !GameModifiersUtils.IsRangedWeapon(weapon))
-        {
-            return false;
-        }
-
+        if (weapon == null || !weapon.IsValid || !GameModifiersUtils.IsRangedWeapon(weapon)) return false;
         CCSWeaponBaseVData? weaponVData = weapon.As<CCSWeaponBase>().VData;
-        if (weaponVData == null)
-        {
-            return false;
-        }
-
+        if (weaponVData == null) return false;
         if (!_cachedMaxClip1.ContainsKey(weapon.DesignerName))
         {
             _cachedMaxClip1.Add(weapon.DesignerName, weaponVData.MaxClip1);
-            if (!_cachedVDataRefs.ContainsKey(weapon.DesignerName))
-            {
-                _cachedVDataRefs.Add(weapon.DesignerName, weaponVData);
-            }
-            Server.NextFrame(() =>
-            {
-                weaponVData.MaxClip1 = 1;
-            });
+            if (!_cachedVDataRefs.ContainsKey(weapon.DesignerName)) _cachedVDataRefs.Add(weapon.DesignerName, weaponVData);
+            Server.NextFrame(() => { weaponVData.MaxClip1 = 1; });
         }
-
         Server.NextFrame(() =>
         {
             weapon.Clip1 = 1;
             Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_iClip1");
         });
-
         return true;
     }
 
@@ -161,56 +147,40 @@ public class GameModifierOnePerMag : GameModifierWeapon
         {
             return;
         }
-
         if (_cachedMaxClip1.ContainsKey(weapon.DesignerName) == false)
         {
             GameModifiersUtils.ResetWeaponAmmo(weapon);
             return;
         }
-
         int originalMaxClip1 = _cachedMaxClip1[weapon.DesignerName];
         _cachedMaxClip1.Remove(weapon.DesignerName);
-
         Server.NextFrame(() =>
         {
             CCSWeaponBaseVData? weaponVData = weapon.As<CCSWeaponBase>().VData;
-            if (weaponVData == null)
-            {
-                Console.WriteLine($"[GameModifierOnePerMag::RemoveWeaponModifier] WARNING: Cannot reset weapon VData for {weapon.DesignerName}!");
-            }
-            else
-            {
-                weaponVData.MaxClip1 = originalMaxClip1;
-            }
-
+            if (weaponVData != null) weaponVData.MaxClip1 = originalMaxClip1;
             GameModifiersUtils.ResetWeaponAmmo(weapon);
         });
     }
 
     public override void Disabled()
     {
-        // Restore any remaining weapon types whose entities no longer exist (never passed through RemoveWeaponModifier).
         foreach (var pair in _cachedMaxClip1.ToList())
         {
-            string designerName = pair.Key;
-            int original = pair.Value;
-            if (_cachedVDataRefs.TryGetValue(designerName, out var vdata) && vdata != null)
-            {
-                vdata.MaxClip1 = original;
-            }
-            _cachedMaxClip1.Remove(designerName);
+            if (_cachedVDataRefs.TryGetValue(pair.Key, out var vdata) && vdata != null) vdata.MaxClip1 = pair.Value;
         }
+        _cachedMaxClip1.Clear();
         _cachedVDataRefs.Clear();
         base.Disabled();
     }
 }
+*/
 
 public class GameModifierOneInTheChamber : GameModifierWeapon
 {
     public override bool SupportsRandomRounds => true;
     public override HashSet<string> IncompatibleModifiers =>
     [
-        GameModifiersUtils.GetModifierName<GameModifierOnePerMag>(),
+        /* GameModifiersUtils.GetModifierName<GameModifierOnePerMag>(), */
         "InfiniteAmmo"
     ];
 
@@ -225,77 +195,45 @@ public class GameModifierOneInTheChamber : GameModifierWeapon
     public override void Enabled()
     {
         base.Enabled();
-
-        if (Core != null)
-        {
-            Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-        }
-        if (_dispatcherId == Guid.Empty)
-        {
-            _dispatcherId = DamageHookDispatcher.Add(OnGlobalDamage);
-        }
+        if (Core != null) Core.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+        if (_dispatcherId == Guid.Empty) _dispatcherId = DamageHookDispatcher.Add(OnGlobalDamage);
     }
 
     public override void Disabled()
     {
-        if (Core != null)
-        {
-            Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-        }
+        if (Core != null) Core.DeregisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         if (_dispatcherId != Guid.Empty)
         {
             DamageHookDispatcher.Remove(_dispatcherId);
             _dispatcherId = Guid.Empty;
         }
-
         base.Disabled();
     }
 
-    private void OnGlobalDamage(CTakeDamageInfo info)
-    {
-        // Multiply all damage (applies globally while active)
-        info.Damage *= 10.0f;
-    }
+    private void OnGlobalDamage(CTakeDamageInfo info) => info.Damage *= 10.0f;
 
     protected override bool ApplyWeaponModifier(CBasePlayerWeapon? weapon)
     {
-        if (weapon == null || !weapon.IsValid || !GameModifiersUtils.IsRangedWeapon(weapon))
-        {
-            return false;
-        }
-
+        if (weapon == null || !weapon.IsValid || !GameModifiersUtils.IsRangedWeapon(weapon)) return false;
         Server.NextFrame(() =>
         {
-            weapon.Clip1 = 1;
-            weapon.Clip2 = 0;
-            weapon.ReserveAmmo[0] = 0;
-
+            weapon.Clip1 = 1; weapon.Clip2 = 0; weapon.ReserveAmmo[0] = 0;
             Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_iClip1");
             Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_iClip2");
             Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_pReserveAmmo");
         });
-
         return true;
     }
 
-    protected override void RemoveWeaponModifier(CBasePlayerWeapon? weapon)
-    {
-        GameModifiersUtils.ResetWeaponAmmo(weapon);
-    }
+    protected override void RemoveWeaponModifier(CBasePlayerWeapon? weapon) => GameModifiersUtils.ResetWeaponAmmo(weapon);
 
     private void AddBullet(CCSPlayerController? player, string weaponName)
     {
         CBasePlayerWeapon? foundWeapon = GameModifiersUtils.GetWeapon(player, weaponName);
-        if (foundWeapon == null || !foundWeapon.IsValid || !GameModifiersUtils.IsRangedWeapon(foundWeapon))
-        {
-            Console.WriteLine($"add bullet: CANNOT FIND WEAPON {weaponName}");
-            return;
-        }
-
+        if (foundWeapon == null || !foundWeapon.IsValid || !GameModifiersUtils.IsRangedWeapon(foundWeapon)) return;
         Server.NextFrame(() =>
         {
             foundWeapon.ReserveAmmo[0] += 1;
-
             Utilities.SetStateChanged(foundWeapon, "CBasePlayerWeapon", "m_pReserveAmmo");
         });
     }
